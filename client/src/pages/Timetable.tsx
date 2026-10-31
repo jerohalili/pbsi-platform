@@ -9,6 +9,7 @@ import { useToast } from '@/components/ui/toast.tsx';
 import { ConfirmDialog } from '@/components/users/ConfirmDialog.tsx';
 import { TimetableFormDialog } from '@/components/timetable/TimetableFormDialog.tsx';
 import {
+  DAY_NAMES,
   DAY_SHORT,
   MIN_PERIODS,
   type TimetableCourse,
@@ -126,7 +127,7 @@ export default function TimetablePage() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-site-bg px-4 py-12">
+    <div className="w-full bg-site-bg px-0 py-6 md:min-h-screen md:px-4 md:py-12">
       <div className="max-w-6xl mx-auto">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -184,7 +185,85 @@ export default function TimetablePage() {
           </p>
         )}
 
-        <div className="rounded-xl border border-site-border bg-site-card overflow-x-auto">
+        {/* Phones: one card per day instead of the wide grid. */}
+        <div className="space-y-4 md:hidden">
+          {DAY_NAMES.map((dayName, dayIdx) => {
+            const dayEntries = entries
+              .filter((e) => e.day_of_week === dayIdx + 1)
+              .sort((a, b) => a.period_number - b.period_number || a.start_time.localeCompare(b.start_time));
+            return (
+              <section key={dayName} className="rounded-xl border border-site-border bg-site-card">
+                <div
+                  className={cn(
+                    'flex items-center justify-between rounded-t-xl border-b border-site-border px-4 py-3',
+                    today === dayIdx + 1 ? 'bg-primary/15 text-primary' : 'bg-primary/5',
+                  )}
+                >
+                  <h2 className="font-bold">
+                    {dayName}
+                    {today === dayIdx + 1 && <span className="ml-2 text-xs font-medium">Today</span>}
+                  </h2>
+                  {canAdd && (
+                    <button
+                      type="button"
+                      aria-label={`Add a class on ${dayName}`}
+                      onClick={() => openCreate(dayIdx + 1)}
+                      className="flex h-10 w-10 items-center justify-center rounded-md hover:bg-primary/10"
+                    >
+                      <Plus className="h-5 w-5" />
+                    </button>
+                  )}
+                </div>
+                {dayEntries.length === 0 ? (
+                  <p className="px-4 py-4 text-sm text-site-muted">No classes</p>
+                ) : (
+                  <ul className="divide-y divide-site-border">
+                    {dayEntries.map((e) => (
+                      <li key={e.id} className="flex items-start gap-3 px-4 py-3">
+                        <div className="w-14 shrink-0 text-center">
+                          <div className="text-xs text-site-muted">Period</div>
+                          <div className="text-lg font-bold text-site-text">{e.period_number}</div>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="font-bold text-site-text">{e.course_code}</div>
+                          <div className="text-sm text-site-text">{e.course_name}</div>
+                          <div className="mt-1 text-xs text-site-muted">
+                            {e.start_time}–{e.end_time} · {e.room}
+                          </div>
+                          <div className="text-xs text-site-muted">
+                            {e.teacher_first_name} {e.teacher_last_name}
+                          </div>
+                        </div>
+                        {e.can_manage && (
+                          <div className="flex shrink-0 -mr-2">
+                            <button
+                              type="button"
+                              aria-label={`Edit ${e.course_code}`}
+                              onClick={() => openEdit(e)}
+                              className="flex h-10 w-10 items-center justify-center rounded-md hover:bg-accent"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`Remove ${e.course_code}`}
+                              onClick={() => setDeleting(e)}
+                              className="flex h-10 w-10 items-center justify-center rounded-md text-destructive hover:bg-destructive/10"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            );
+          })}
+        </div>
+
+        <div className="hidden rounded-xl border border-site-border bg-site-card overflow-x-auto md:block">
           <div className="min-w-[980px]">
             <div className={cn(GRID_COLS, 'border-b border-site-border')}>
               <div className="px-3 py-4 font-bold text-site-text border-r border-site-border">Period</div>

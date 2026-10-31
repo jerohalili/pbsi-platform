@@ -1,8 +1,9 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import useAuth from '@/hooks/useAuth.ts';
 import useUnreadNotifications from '@/hooks/useUnreadNotifications.ts';
 import { UserAvatar } from '@/components/common/UserAvatar.tsx';
+import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet.tsx';
 import {
   LayoutDashboard,
   Users,
@@ -16,6 +17,8 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
+  Menu,
+  X,
   ShieldAlert,
   BookOpen,
   Award,
@@ -80,7 +83,7 @@ export function Sidebar() {
 
   return (
     <aside
-      className={`fixed left-0 top-0 h-full border-r border-input bg-background z-20 transition-all duration-300 ${
+      className={`hidden md:block fixed left-0 top-0 h-full border-r border-input bg-background z-20 transition-all duration-300 ${
         collapsed ? 'w-16' : 'w-64'
       }`}
     >
@@ -174,12 +177,127 @@ export function TopNav() {
 
   return (
     <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b border-input bg-background/95 backdrop-blur px-4">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3 md:gap-4">
+        <MobileNav />
+        <span className="font-bold text-lg tracking-tight md:hidden">PBSI</span>
         <span className="hidden sm:block text-sm text-muted-foreground">
           {(user?.role ?? '').charAt(0).toUpperCase() + (user?.role ?? '').slice(1)} Portal
         </span>
       </div>
     </header>
+  );
+}
+
+/** Phone navigation: a slide-in drawer opened from the top bar (the fixed sidebar is desktop-only). */
+export function MobileNav() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const unread = useUnreadNotifications(Boolean(user));
+  const [open, setOpen] = useState(false);
+
+  const items = navItems.filter((i) => i.roles.includes(user?.role as any));
+
+  // Close after any navigation (including the browser Back button).
+  useEffect(() => {
+    setOpen(false);
+  }, [location.pathname]);
+
+  // Close if the screen grows past the phone breakpoint (e.g. rotating a tablet).
+  useEffect(() => {
+    const query = window.matchMedia('(min-width: 768px)');
+    const onChange = (e: MediaQueryListEvent) => {
+      if (e.matches) setOpen(false);
+    };
+    query.addEventListener('change', onChange);
+    return () => query.removeEventListener('change', onChange);
+  }, []);
+
+  const go = (href: string) => {
+    navigate(href);
+    setOpen(false);
+  };
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <button
+          type="button"
+          aria-label={unread > 0 ? `Open menu, ${unread} unread notifications` : 'Open menu'}
+          className="relative -ml-2 flex h-11 w-11 items-center justify-center rounded-md hover:bg-accent md:hidden"
+        >
+          <Menu className="h-5 w-5" />
+          {unread > 0 && <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-destructive" />}
+        </button>
+      </SheetTrigger>
+      <SheetContent
+        side="left"
+        aria-describedby={undefined}
+        className="flex w-72 max-w-[85vw] flex-col gap-0 rounded-none p-0 sm:max-w-[85vw] sm:rounded-none"
+      >
+        <SheetTitle className="sr-only">Navigation menu</SheetTitle>
+        <div className="flex h-16 shrink-0 items-center justify-between border-b border-input px-4">
+          <span className="font-bold text-lg tracking-tight">PBSI</span>
+          <SheetClose asChild>
+            <button type="button" aria-label="Close menu" className="flex h-11 w-11 items-center justify-center rounded-md hover:bg-accent -mr-2">
+              <X className="h-5 w-5" />
+            </button>
+          </SheetClose>
+        </div>
+
+        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+          {items.map((item) => {
+            const isActive = location.pathname === item.href;
+            const badge = item.href === '/notifications' ? unread : 0;
+            return (
+              <button
+                key={item.href}
+                type="button"
+                onClick={() => go(item.href)}
+                aria-label={badge > 0 ? `${item.label}, ${badge} unread` : item.label}
+                aria-current={isActive ? 'page' : undefined}
+                className={`flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                  isActive ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-accent'
+                }`}
+              >
+                <span className="h-5 w-5">{item.icon}</span>
+                <span>{item.label}</span>
+                {badge > 0 && (
+                  <span className="ml-auto min-w-5 rounded-full bg-destructive px-1.5 py-0.5 text-center text-xs font-semibold leading-none text-destructive-foreground">
+                    {badge > 99 ? '99+' : badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="shrink-0 border-t border-input p-3">
+          <div className="flex items-center gap-3 p-2">
+            <UserAvatar
+              src={user?.avatar_url}
+              name={`${user?.first_name ?? ''} ${user?.last_name ?? ''}`}
+              fallback={user?.email}
+            />
+            <div className="flex min-w-0 flex-col">
+              <span className="truncate text-sm font-medium">
+                {user?.first_name} {user?.last_name}
+              </span>
+              <span className="truncate text-xs text-muted-foreground">{user?.email}</span>
+              <span className="truncate text-xs capitalize text-muted-foreground">{user?.role}</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => logout()}
+            className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-destructive transition-colors hover:bg-destructive/10"
+          >
+            <LogOut className="h-4 w-4" />
+            <span>Sign out</span>
+          </button>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -210,7 +328,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       <Sidebar />
       <div
         className={`transition-all duration-300 ${
-          collapsed ? 'pl-16' : 'md:pl-64 pl-16'
+          collapsed ? 'md:pl-16' : 'md:pl-64'
         }`}
       >
         <TopNav />
@@ -227,7 +345,7 @@ export function TeacherLayout({ children }: { children: React.ReactNode }) {
       <Sidebar />
       <div
         className={`transition-all duration-300 ${
-          collapsed ? 'pl-16' : 'md:pl-64 pl-16'
+          collapsed ? 'md:pl-16' : 'md:pl-64'
         }`}
       >
         <TopNav />
@@ -244,7 +362,7 @@ export function StudentLayout({ children }: { children: React.ReactNode }) {
       <Sidebar />
       <div
         className={`transition-all duration-300 ${
-          collapsed ? 'pl-16' : 'md:pl-64 pl-16'
+          collapsed ? 'md:pl-16' : 'md:pl-64'
         }`}
       >
         <TopNav />

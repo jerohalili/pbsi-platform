@@ -185,7 +185,7 @@ export default function AuditLogsPage() {
   const filtered = Object.values(filters).some(Boolean);
 
   return (
-    <div className="min-h-screen w-full bg-site-bg px-4 py-12">
+    <div className="w-full bg-site-bg px-0 py-6 md:min-h-screen md:px-4 md:py-12">
       <div className="max-w-5xl mx-auto">
         <div className="flex items-center gap-2 mb-4">
           <ShieldAlert className="w-5 h-5 text-site-muted" />

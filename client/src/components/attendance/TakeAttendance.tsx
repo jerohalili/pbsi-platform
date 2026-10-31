@@ -233,33 +233,33 @@ export function TakeAttendance({ courses }: { courses: CourseOption[] }) {
         <table className="w-full text-left">
           <thead>
             <tr className="border-b border-site-border">
-              <th className="px-6 py-4 text-sm font-bold text-site-muted">Student</th>
-              <th className="px-6 py-4 text-sm font-bold text-site-muted">Status</th>
+              <th className="px-3 py-4 text-sm font-bold text-site-muted sm:px-6">Student</th>
+              <th className="px-3 py-4 text-sm font-bold text-site-muted sm:px-6">Status</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={2} className="px-6 py-8 text-center text-site-muted">
+                <td colSpan={2} className="px-3 py-8 text-center text-site-muted sm:px-6">
                   Loading class list…
                 </td>
               </tr>
             ) : visible.length === 0 ? (
               <tr>
-                <td colSpan={2} className="px-6 py-8 text-center text-site-muted">
+                <td colSpan={2} className="px-3 py-8 text-center text-site-muted sm:px-6">
                   {rows.length === 0 ? 'There are no active students yet.' : 'No students match your search.'}
                 </td>
               </tr>
             ) : (
               visible.map((r) => (
                 <tr key={r.student_id} className="border-b border-site-border">
-                  <td className="px-6 py-3">
+                  <td className="px-3 py-3 sm:px-6">
                     <div className="font-medium text-site-text">
                       {r.last_name}, {r.first_name}
                     </div>
                     {r.student_number && <div className="text-xs text-site-muted">{r.student_number}</div>}
                   </td>
-                  <td className="px-6 py-3">
+                  <td className="px-3 py-3 sm:px-6">
                     <div
                       role="group"
                       aria-label={`Attendance for ${r.first_name} ${r.last_name}`}
@@ -274,7 +274,7 @@ export function TakeAttendance({ courses }: { courses: CourseOption[] }) {
                             aria-pressed={active}
                             onClick={() => pick(r.student_id, s.value)}
                             className={cn(
-                              'px-3 py-1.5 rounded-md border text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                              'px-3 py-2 sm:py-1.5 rounded-md border text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                               active
                                 ? cn(STATUS_BADGE[s.value], 'border-current')
                                 : 'border-site-border bg-white text-site-muted hover:bg-gray-50 dark:bg-card',

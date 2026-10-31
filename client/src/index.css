@@ -117,3 +117,14 @@
     max-height: min(28rem, 70vh);
   }
 }
+
+/* iOS Safari zooms the page when a focused field uses text smaller than 16px.
+   Phones only; desktop sizes are unchanged. Unlayered so it wins over the text-sm utility. */
+@media (max-width: 767px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='file']),
+  select,
+  textarea,
+  [contenteditable='true'] {
+    font-size: 16px;
+  }
+}

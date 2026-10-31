@@ -73,7 +73,7 @@ export default function AttendancePage() {
   const takeableCourses = user?.role === 'teacher' ? courses.filter((c) => c.is_mine) : courses;
 
   return (
-    <div className="min-h-screen w-full bg-site-bg px-4 py-12">
+    <div className="w-full bg-site-bg px-0 py-6 md:min-h-screen md:px-4 md:py-12">
       <div className="max-w-5xl mx-auto">
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-site-text">Attendance</h1>

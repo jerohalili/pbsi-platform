@@ -27,9 +27,10 @@ There are three roles. Accounts are created by staff; public sign-up is disabled
 - **Attendance**: teachers and admins load a class roster for a course and date and save it in bulk or one student at a time. There is one record per student, course and day; saving again updates it. Changing an already-recorded status is treated as a correction and audited (`attendance.override`). Students see their own records and a summary.
 - **Timetable**: weekly schedule, Monday to Saturday, by period. The API refuses an entry that would double-book a teacher, a room or a course (409 with a message saying what clashes).
 - **Discussions**: each course has its own board. Everyone signed in can start a discussion (title and opening post), reply (optionally to a specific reply), edit or delete their own posts and report a post. The course's teacher and admins can pin, lock, mark the answer and delete any post; a deleted reply stays as a short placeholder so the conversation still reads well. Posts are plain text. Replies notify the asker, the person answered and the course teacher; reports notify the course teacher and admins (never the writer, and without naming the reporter) and are audited. Creating threads, replies and reports is limited to 30 per 10 minutes per user.
-- **Notifications**: in-app alerts, with an unread badge in the sidebar (refreshed every minute). People are told about: new assignments and opened quizzes (all active students, since students are not enrolled per course), being marked absent, a grade or an adjusted grade, discussion replies and reports, and (teachers) a student's new or updated hand-in. Staff can also send a message (`POST /notifications`; teachers only to students). The page filters unread, marks one or all as read, removes and pages through older ones.
+- **Notifications**: in-app alerts, with an unread badge in the sidebar and on the phone menu button (refreshed every minute). People are told about: new assignments and opened quizzes (all active students, since students are not enrolled per course), being marked absent, a grade or an adjusted grade, discussion replies and reports, and (teachers) a student's new or updated hand-in. Staff can also send a message (`POST /notifications`; teachers only to students). The page filters unread, marks one or all as read, removes and pages through older ones.
 - **Audit logs** (admin only, read-only through the API) for role changes, deactivations, password resets, deletions, grade overrides, submission grading, attendance corrections, staff-sent notifications, and creating, changing or deleting courses, assignments and quizzes. Entries record who, what, which record, the before/after values and the IP address. Grade overrides are saved in the same transaction as their audit entry; the rest are best-effort. The page filters by action, record type and date, and shows what changed.
 - **Dashboards** with role-specific stats.
+- **Phones and tablets**: the whole app is usable on a phone (see *Phones and tablets* below).
 
 ### File uploads
 
@@ -43,9 +44,13 @@ Admins and teachers can upload images, videos and files for module content. File
 
 Private files are never exposed by URL. `GET /submissions/:id/download` and `GET /assignments/:id/attachment` check who is asking, then return a signed `attachment` link that expires after 5 minutes. A submission can be downloaded by its owner and by the course's teacher or an admin. Deleting an assignment, quiz, question or account also removes the files that belonged to it from Cloudinary (best effort). Allowed document types: PDF, Word, PowerPoint, Excel, OpenDocument, text, CSV, RTF, ZIP, JPG, PNG, WebP. The server refuses to start (with instructions) until `server/sql/cloudinary-uploads.sql` has been run.
 
+### Phones and tablets
+
+The client is responsive. Below 768px (Tailwind's `md` breakpoint) the fixed sidebar is replaced by a slide-in menu opened from the top bar (the menu button shows a dot when you have unread notifications), the weekly timetable becomes a day-by-day list, dialogs fit the screen and scroll inside, and form fields use 16px text so iOS Safari does not zoom in when one is focused. From 768px up the desktop layout is unchanged. Wide tables scroll sideways inside their card. Layouts are checked by hand (browser device mode and a real phone); there are no automated layout tests.
+
 ## Tech Stack
 
-- **Frontend** (`client/`): React 18, Vite 6, TypeScript, Tailwind CSS, Radix UI primitives (shadcn-style components), React Router 7, React Query, react-hook-form + zod, Axios.
+- **Frontend** (`client/`): React 18, Vite 6, TypeScript, Tailwind CSS, Radix UI primitives (shadcn-style components), React Router 7, React Query, react-hook-form + zod, Axios, Tiptap (rich-text editor) and DOMPurify (sanitizes rich text before it is shown).
 - **Backend** (`server/`): Node 20+, Express 4, TypeScript (ESM), zod validation, `jsonwebtoken`, `bcryptjs`, helmet, CORS, `express-rate-limit`, `multer` and `cloudinary` for uploads.
 - **Database**: PostgreSQL on [Neon](https://neon.tech), accessed through `@neondatabase/serverless` (tagged-template `sql` queries).
 - **Hosting**: client on Vercel (SPA rewrite in `client/vercel.json`), API on Render.
@@ -60,6 +65,7 @@ pbsi-platform/
 │   ├── sql/                # One-off SQL scripts to run in the Neon SQL editor (see below)
 │   └── src/{routes,controllers,middleware,utils,config,types}
 ├── neon.ts                 # Neon project config (branch policy)
+├── package.json            # Only the Neon config dependencies; there are no root scripts
 ├── DESIGN_SYSTEM.md        # NOTE: describes the separate PBSI marketing site, not this app
 └── README.md
 ```
@@ -83,7 +89,7 @@ npm run dev                 # http://localhost:5173 (proxies /api to localhost:4
 
 > **Windows only:** `server`'s `dev` script uses `set TS_NODE_TRANSPILE_ONLY=true&&`, which works in Windows `cmd`/npm but not on macOS/Linux. On those systems run `TS_NODE_TRANSPILE_ONLY=true node --env-file=.env --watch --experimental-specifier-resolution=node --loader ts-node/esm src/server.ts`.
 
-Other scripts: `npm run typecheck` (both packages), `npm run build` (both packages), `npm start` (server, runs `dist/`).
+Other scripts, run inside `server/` or `client/` (the repo root has no scripts): `npm run typecheck`, `npm run build`, `npm start` (server only; runs the compiled `dist/`), `npm run preview` (client only; serves the production build).
 
 ## Environment Variables
 
@@ -112,7 +118,7 @@ VITE_API_URL=http://localhost:4000     # optional; defaults to /api (Vite dev pr
 
 The app expects these tables (derived from the queries in `server/src/controllers/`):
 
-`users`, `profiles`, `students`, `teachers`, `courses`, `modules`, `assignments`, `submissions`, `quizzes`, `quiz_questions`, `quiz_attempts`, `grades`, `attendance`, `timetable`, `discussion_threads`, `discussion_replies`, `notifications`, `audit_logs`.
+`users`, `profiles`, `students`, `teachers`, `courses`, `modules`, `assignments`, `submissions`, `quizzes`, `quiz_questions`, `quiz_attempts`, `grades`, `attendance`, `timetable`, `discussion_threads`, `discussion_replies`, `discussion_reports`, `notifications`, `audit_logs`.
 
 There is no full schema file in the repo yet; create the tables in Neon first. Column names are the ones the controllers use.
 
@@ -152,10 +158,24 @@ All routes are under `/api` and need a valid session except `/auth/login`, `/aut
 | `/attendance`                    | List, `roster` (admin/teacher), `summary/:student_id`, `POST /` (one record) and `POST /bulk` (admin/teacher)              |
 | `/timetable`                     | List, create, update, delete (admin/teacher); double-booking returns 409                                                   |
 | `/discussions`                   | `GET /:course_id` (threads), `POST /`, `GET/PATCH/DELETE /threads/:id`, `POST /threads/:id/report`, `GET/POST /:thread_id/replies`, `PATCH/DELETE /replies/:id`, `POST /replies/:id/report` |
-| `/notifications`                 | In-app notifications                                                                                                       |
+| `/notifications`                 | `GET /`, `GET /unread-count`, `PATCH /read-all`, `PATCH /:id/read`, `DELETE /:id`, and `POST /` (staff send a message; teachers only to students) |
 | `/audit-logs`                    | Admin only; read-only, with `action`, `entity_type`, `entity_id`, `from`, `to`, `page` and `limit` filters                |
 | `/dashboard/stats`               | Role-specific counts                                                                                                       |
 | `/health`                        | Liveness check                                                                                                             |
+
+## Deployment
+
+The client and the API are deployed separately, and each needs to know the other's address.
+
+**Client on Vercel**: Framework preset Vite, root directory `client`, build command `npm run build`, output directory `dist`, and the environment variable `VITE_API_URL=https://<your-api>.onrender.com`. The single-page-app rewrite is already in `client/vercel.json`.
+
+**API on Render**: runtime Node, root directory `server`, build command `npm install && npm run build`, start command `npm start`, and the server environment variables above with `NODE_ENV=production`. Render provides `PORT` itself.
+
+Things that commonly go wrong:
+
+- `CORS_ORIGIN` must be exactly the client's address, such as `https://pbsi-platform.vercel.app`, with no trailing slash. The server reads only `CORS_ORIGIN`; if it is missing it falls back to `http://localhost:5173` and the browser blocks every request with a CORS error.
+- Run the SQL scripts marked **Before** in Neon before deploying the server that needs them.
+- On Render's free plan the API sleeps when idle, so the first request after a quiet period can take about 30 seconds. The client waits and retries instead of signing people out.
 
 ## Security
 

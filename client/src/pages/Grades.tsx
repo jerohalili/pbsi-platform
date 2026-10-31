@@ -247,7 +247,7 @@ export default function GradesPage() {
   if (!isAuthenticated) return null;
 
   return (
-    <div className="min-h-screen w-full bg-site-bg px-4 py-12">
+    <div className="w-full bg-site-bg px-0 py-6 md:min-h-screen md:px-4 md:py-12">
       <div className="max-w-6xl mx-auto">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
           <div>

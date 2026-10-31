@@ -188,7 +188,7 @@ export default function NotificationsPage() {
   if (!isAuthenticated) return null;
 
   return (
-    <div className="min-h-screen w-full bg-site-bg px-4 py-12">
+    <div className="w-full bg-site-bg px-0 py-6 md:min-h-screen md:px-4 md:py-12">
       <div className="max-w-3xl mx-auto">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
