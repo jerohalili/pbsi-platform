@@ -110,9 +110,13 @@ function ToastContent({ toast, onDismiss }: { toast: Toast; onDismiss: () => voi
   );
 }
 
+// One function for the whole app. It must never change between renders: pages list `toast` in
+// the dependencies of useCallback/useEffect, and a new function every render made the
+// Notifications page reload itself endlessly (hundreds of requests, stuck on the skeleton).
+const toast = (options: Omit<Toast, 'id'>) => {
+  addToToast(options);
+};
+
 export function useToast() {
-  const toast = (options: Omit<Toast, 'id'>) => {
-    addToToast(options);
-  };
   return { toast };
 }
