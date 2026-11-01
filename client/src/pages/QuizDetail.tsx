@@ -57,7 +57,7 @@ export default function QuizDetailPage() {
   );
   const quiz = data?.quiz;
   const questions = data?.questions ?? [];
-  const canManage = !!quiz?.can_manage;
+  const canManage = !isStudent && !!quiz?.can_manage;
 
   const { data: attemptData, isLoading: attemptsLoading } = useGet<{ attempts: AttemptRow[] }>(
     ['quiz-attempts', id ?? ''],

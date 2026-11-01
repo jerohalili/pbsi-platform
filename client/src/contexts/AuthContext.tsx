@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { useQueryClient } from 'react-query';
 import axios from 'axios';
 import api, { API_BASE_URL, AUTH_EXPIRED_EVENT } from '@/lib/api.ts';
 import { resolveSession } from '@/lib/session.ts';
@@ -35,6 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   // `initial` is true when the app is starting. Only then may a failed check show the sign-in page;
   // a later refresh (for example after changing a picture) never signs anyone out because the
@@ -75,12 +77,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // The session ended while the app was open (e.g. the account was deactivated).
   useEffect(() => {
     const onExpired = () => {
+      queryClient.clear();
       setUser(null);
       navigate('/login', { replace: true });
     };
     window.addEventListener(AUTH_EXPIRED_EVENT, onExpired);
     return () => window.removeEventListener(AUTH_EXPIRED_EVENT, onExpired);
-  }, [navigate]);
+  }, [navigate, queryClient]);
 
   const login = async (email: string, password: string) => {
     const { data } = await api.post<{ user: AuthUser; access_token: string }>(
@@ -89,6 +92,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
     localStorage.setItem('access_token', data.access_token);
     localStorage.setItem('user', JSON.stringify(data.user));
+    // Pages cache what the server sent to the PREVIOUS person (a teacher's quizzes carry
+    // "can manage" flags, drafts, class results). Drop it all so the next person only ever
+    // sees data fetched with their own sign-in.
+    queryClient.clear();
     setUser(data.user);
     navigate('/');
   };
@@ -97,6 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     api.post('/auth/logout').catch(() => {});
     localStorage.removeItem('access_token');
     localStorage.removeItem('user');
+    queryClient.clear();
     setUser(null);
     navigate('/login');
   };

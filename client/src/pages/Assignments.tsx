@@ -90,6 +90,9 @@ export default function AssignmentsPage() {
                   <>
                     <TableHead className="w-48">Status</TableHead>
                     <TableHead className="w-28">Score</TableHead>
+                    <TableHead className="w-28">
+                      <span className="sr-only">Open</span>
+                    </TableHead>
                   </>
                 ) : (
                   <>
@@ -106,7 +109,7 @@ export default function AssignmentsPage() {
               {assignments.map((a) => (
                 <TableRow key={a.id}>
                   <TableCell>
-                    {a.can_manage ? (
+                    {!isStudent && a.can_manage ? (
                       <span className="font-medium">{a.title}</span>
                     ) : (
                       <Link to={`/assignments/${a.id}`} className="font-medium hover:underline">
@@ -126,15 +129,22 @@ export default function AssignmentsPage() {
                       <TableCell className="text-sm">
                         {a.grade !== null ? `${a.grade} / ${a.max_score}` : '—'}
                       </TableCell>
+                      <TableCell>
+                        <Button asChild size="sm" variant="outline" aria-label={`Open assignment ${a.title}`}>
+                          <Link to={`/assignments/${a.id}`}>
+                            {a.status === 'not_submitted' || a.status === 'overdue' ? 'Submit' : 'View'}
+                          </Link>
+                        </Button>
+                      </TableCell>
                     </>
                   ) : (
                     <>
                       <TableCell className="text-sm">{a.max_score}</TableCell>
                       <TableCell className="text-sm">
-                        {a.can_manage ? `${a.submitted_count ?? 0} handed in · ${a.graded_count ?? 0} graded` : '—'}
+                        {!isStudent && a.can_manage ? `${a.submitted_count ?? 0} handed in · ${a.graded_count ?? 0} graded` : '—'}
                       </TableCell>
                       <TableCell>
-                        {a.can_manage && (
+                        {!isStudent && a.can_manage && (
                           <Button asChild size="sm" aria-label={`Open assignment ${a.title}`}>
                             <Link to={`/assignments/${a.id}`}>
                               Open <ArrowRight className="w-4 h-4 ml-2" />

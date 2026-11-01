@@ -31,6 +31,7 @@ import { ModuleFormDialog, ModuleFormValues } from '@/components/courses/ModuleF
 import { ModuleContentViewer } from '@/components/courses/ModuleContentViewer.tsx';
 import { ConfirmDialog } from '@/components/users/ConfirmDialog.tsx';
 import { AssignmentFormDialog } from '@/components/assignments/AssignmentFormDialog.tsx';
+import { AssignmentStatusBadge } from '@/components/assignments/AssignmentStatusBadge.tsx';
 import type { AssignmentItem } from '@/components/assignments/types.ts';
 import { QuizFormDialog } from '@/components/quizzes/QuizFormDialog.tsx';
 import { formatTimeLimit, type QuizItem } from '@/components/quizzes/types.ts';
@@ -110,6 +111,7 @@ export default function CourseDetailPage() {
   const quizzes = quizData?.quizzes ?? [];
 
   const isAdmin = user?.role === 'admin';
+  const isStudent = user?.role === 'student';
   const course = data?.course;
   const modules = data?.modules ?? [];
   const canEdit = !!course && (isAdmin || (user?.role === 'teacher' && course.is_mine));
@@ -416,14 +418,14 @@ export default function CourseDetailPage() {
                   <div className="space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <HelpCircle className="w-4 h-4 text-muted-foreground shrink-0" />
-                      {q.can_manage ? (
+                      {(!isStudent && q.can_manage) ? (
                         <span className="font-medium">{q.title}</span>
                       ) : (
                         <Link to={`/quizzes/${q.id}`} className="font-medium hover:underline">
                           {q.title}
                         </Link>
                       )}
-                      {q.can_manage && (
+                      {(!isStudent && q.can_manage) && (
                         <Badge variant={q.is_published ? 'success' : 'warning'}>{q.is_published ? 'Published' : 'Draft'}</Badge>
                       )}
                     </div>
@@ -442,14 +444,14 @@ export default function CourseDetailPage() {
                         <Link to={`/quizzes/${q.id}`}>Take quiz</Link>
                       </Button>
                     ) : null}
-                    {q.can_manage && (
+                    {(!isStudent && q.can_manage) && (
                       <Button asChild size="sm" aria-label={`Open quiz ${q.title}`}>
                         <Link to={`/quizzes/${q.id}`}>
                           Open <ArrowRight className="w-4 h-4 ml-2" />
                         </Link>
                       </Button>
                     )}
-                    {q.can_manage && (
+                    {(!isStudent && q.can_manage) && (
                       <Button
                         variant="destructive"
                         size="icon"
@@ -498,7 +500,7 @@ export default function CourseDetailPage() {
                   <div className="space-y-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <ClipboardList className="w-4 h-4 text-muted-foreground shrink-0" />
-                      {a.can_manage ? (
+                      {(!isStudent && a.can_manage) ? (
                         <span className="font-medium truncate">{a.title}</span>
                       ) : (
                         <Link to={`/assignments/${a.id}`} className="font-medium hover:underline truncate">
@@ -511,12 +513,17 @@ export default function CourseDetailPage() {
                       Due {formatDateTime(a.due_date)} · Max {a.max_score}
                       {a.grade !== null && ` · Your grade: ${a.grade}`}
                     </p>
-                    {a.status && (
-                      <span className="text-xs text-muted-foreground">{a.status}</span>
-                    )}
+                    {a.status && <AssignmentStatusBadge status={a.status} isLate={a.is_late} />}
                   </div>
                   <div className="flex shrink-0 gap-2">
-                    {a.can_manage && (
+                    {isStudent && (
+                      <Button asChild size="sm" variant="outline" aria-label={`Open assignment ${a.title}`}>
+                        <Link to={`/assignments/${a.id}`}>
+                          {a.status === 'not_submitted' || a.status === 'overdue' ? 'Submit' : 'View'}
+                        </Link>
+                      </Button>
+                    )}
+                    {(!isStudent && a.can_manage) && (
                       <Button asChild size="sm" aria-label={`Open assignment ${a.title}`}>
                         <Link to={`/assignments/${a.id}`}>
                           Open <ArrowRight className="w-4 h-4 ml-2" />

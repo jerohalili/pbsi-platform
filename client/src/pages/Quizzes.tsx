@@ -98,7 +98,7 @@ export default function QuizzesPage() {
               {quizzes.map((q) => (
                 <TableRow key={q.id}>
                   <TableCell>
-                    {q.can_manage ? (
+                    {(!isStudent && q.can_manage) ? (
                       <span className="font-medium">{q.title}</span>
                     ) : (
                       <Link to={`/quizzes/${q.id}`} className="font-medium hover:underline">
@@ -129,12 +129,12 @@ export default function QuizzesPage() {
                         <Badge variant={q.is_published ? 'success' : 'outline'}>{q.is_published ? 'Published' : 'Draft'}</Badge>
                       </TableCell>
                       <TableCell className="text-sm">
-                        {q.can_manage
+                        {(!isStudent && q.can_manage)
                           ? `${q.attempt_count ?? 0}${q.average_score !== null ? ` · avg ${q.average_score}%` : ''}`
                           : '—'}
                       </TableCell>
                       <TableCell>
-                        {q.can_manage && (
+                        {(!isStudent && q.can_manage) && (
                           <Button asChild size="sm" aria-label={`Open quiz ${q.title}`}>
                             <Link to={`/quizzes/${q.id}`}>
                               Open <ArrowRight className="w-4 h-4 ml-2" />

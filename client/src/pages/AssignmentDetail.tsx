@@ -71,7 +71,7 @@ export default function AssignmentDetailPage() {
     { enabled: !!id },
   );
   const assignment = data?.assignment;
-  const canManage = !!assignment?.can_manage;
+  const canManage = !isStudent && !!assignment?.can_manage;
 
   const { data: subData, isLoading: subsLoading } = useGet<{ submissions: SubmissionRow[] }>(
     ['submissions', id ?? ''],
