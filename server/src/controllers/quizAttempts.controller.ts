@@ -30,6 +30,11 @@ export async function submitQuizAttempt(req: Request, res: Response): Promise<vo
   const [quiz] = await sql`SELECT id, course_id, is_published FROM quizzes WHERE id = ${input.quiz_id}`;
   // An unpublished quiz does not exist as far as students are concerned.
   if (!quiz || quiz.is_published !== true) throw httpError(404, 'Quiz not found');
+  // Neither does a quiz of a course the student is not enrolled in.
+  const [enrolled] = await sql`
+    SELECT 1 AS ok FROM enrollments WHERE course_id = ${quiz.course_id} AND student_id = ${studentId}
+  `;
+  if (!enrolled) throw httpError(404, 'Quiz not found');
 
   const questions = (await sql`
     SELECT id, type, correct_answer, points FROM quiz_questions WHERE quiz_id = ${input.quiz_id}

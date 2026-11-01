@@ -7,6 +7,7 @@ import {
 import {
   assertCanManageAssignment,
   assertCanManageModule,
+  assertCanViewAssignment,
   assertHttpUrl,
   getOwnStudentId,
   httpError,
@@ -24,7 +25,7 @@ import {
 } from '../utils/upload.js';
 import type { AuthUser } from '../types/index.js';
 import { recordAudit, diffValues } from '../utils/audit.js';
-import { notifyAllStudents, formatManila } from '../utils/notify.js';
+import { notifyCourseStudents, formatManila } from '../utils/notify.js';
 
 function currentUser(req: Request): AuthUser {
   if (!req.user) throw httpError(401, 'Not authenticated');
@@ -38,7 +39,8 @@ interface AssignmentFilters {
 }
 
 /**
- * Assignments as seen by the signed-in person:
+ * Assignments as seen by the signed-in person. Drafts are visible only to the teacher who owns the
+ * course (and admins), exactly like quizzes, and students see only the courses they are enrolled in:
  *  - everyone gets the course/module context and `can_manage`
  *  - students also get their own submission and a `status`
  *  - teachers/admins also get submission counts
@@ -48,7 +50,7 @@ async function queryAssignments(user: AuthUser, filters: AssignmentFilters) {
   const ownStudentId = isStudent ? await getOwnStudentId(user.id) : null;
 
   const rows = await sql`
-    SELECT a.id, a.module_id, a.title, a.instructions, a.due_date,
+    SELECT a.id, a.module_id, a.title, a.instructions, a.due_date, a.is_published,
            a.max_score::float8 AS max_score, a.attachment_url, a.attachment_name,
            (a.attachment_public_id IS NOT NULL) AS has_attachment_file, a.created_at,
            m.title AS module_title,
@@ -75,6 +77,10 @@ async function queryAssignments(user: AuthUser, filters: AssignmentFilters) {
     WHERE (${filters.id ?? ''}::text = '' OR a.id = NULLIF(${filters.id ?? ''}::text, '')::uuid)
       AND (${filters.courseId ?? ''}::text = '' OR c.id = NULLIF(${filters.courseId ?? ''}::text, '')::uuid)
       AND (${filters.moduleId ?? ''}::text = '' OR a.module_id = NULLIF(${filters.moduleId ?? ''}::text, '')::uuid)
+      AND (a.is_published = TRUE OR te.user_id = ${user.id} OR ${user.role === 'admin'}::boolean)
+      AND (${!isStudent}::boolean OR EXISTS (
+            SELECT 1 FROM enrollments en WHERE en.course_id = c.id AND en.student_id = ${ownStudentId}::uuid
+          ))
     ORDER BY a.due_date ASC, a.created_at ASC
   `;
 
@@ -125,10 +131,11 @@ export async function createAssignment(req: Request, res: Response): Promise<voi
 
   const courseId = await assertCanManageModule(user, input.module_id);
 
+  // New assignments start as drafts; students hear about one only when it is published.
   const [created] = await sql`
-    INSERT INTO assignments (module_id, title, instructions, due_date, max_score, attachment_url)
+    INSERT INTO assignments (module_id, title, instructions, due_date, max_score, attachment_url, is_published)
     VALUES (${input.module_id}, ${input.title}, ${input.instructions || null},
-            ${input.due_date}, ${input.max_score}, ${input.attachment_url || null})
+            ${input.due_date}, ${input.max_score}, ${input.attachment_url || null}, FALSE)
     RETURNING id
   `;
 
@@ -138,19 +145,6 @@ export async function createAssignment(req: Request, res: Response): Promise<voi
     max_score: input.max_score,
     course_id: courseId,
   });
-
-  // Students need to know about new work, but only once: best effort, never blocks the teacher.
-  try {
-    const [course] = await sql`SELECT code FROM courses WHERE id = ${courseId}`;
-    await notifyAllStudents({
-      type: 'assignment',
-      title: 'New assignment',
-      message: `${input.title}${course?.code ? ` (${course.code})` : ''} is due ${formatManila(input.due_date)}`,
-      link: `/assignments/${created.id}`,
-    });
-  } catch (err) {
-    console.error('[assignments] could not notify students:', err);
-  }
 
   const [assignment] = await queryAssignments(user, { id: created.id as string });
   res.status(201).json({ assignment });
@@ -178,6 +172,14 @@ export async function updateAssignment(req: Request, res: Response): Promise<voi
     }
   }
 
+  // Taking an assignment back to draft would hide work students have already handed in.
+  if (input.is_published === false && before.is_published) {
+    const [handedIn] = await sql`SELECT COUNT(*)::int AS n FROM submissions WHERE assignment_id = ${id}`;
+    if (handedIn && handedIn.n > 0) {
+      throw httpError(409, 'Students have already handed in work, so this assignment can no longer be unpublished.');
+    }
+  }
+
   // Optional text fields: undefined = leave unchanged, '' = clear.
   const instructionsProvided = input.instructions !== undefined;
   const attachmentProvided = input.attachment_url !== undefined;
@@ -188,19 +190,49 @@ export async function updateAssignment(req: Request, res: Response): Promise<voi
         instructions = CASE WHEN ${instructionsProvided}::boolean THEN ${input.instructions || null} ELSE instructions END,
         due_date = COALESCE(${input.due_date ?? null}::timestamptz, due_date),
         max_score = COALESCE(${input.max_score ?? null}::numeric, max_score),
+        is_published = COALESCE(${input.is_published ?? null}::boolean, is_published),
         attachment_url = CASE WHEN ${attachmentProvided}::boolean THEN ${input.attachment_url || null} ELSE attachment_url END
     WHERE id = ${id}
   `;
 
   const changes = diffValues(
-    { title: before.title, max_score: before.max_score, due_date: new Date(before.due_date).toISOString() },
+    {
+      title: before.title,
+      max_score: before.max_score,
+      due_date: new Date(before.due_date).toISOString(),
+      is_published: before.is_published,
+    },
     {
       title: input.title,
       max_score: input.max_score,
       due_date: input.due_date ? new Date(input.due_date).toISOString() : undefined,
+      is_published: input.is_published,
     },
   );
   if (changes) await recordAudit(req, 'assignment.update', 'assignment', id, changes.old, changes.new);
+
+  // Work that has just been opened is news for students (not every later edit of it).
+  if (!before.is_published && input.is_published === true) {
+    try {
+      const [fresh] = await sql`
+        SELECT a.title, a.due_date, c.code
+        FROM assignments a
+        JOIN modules m ON m.id = a.module_id
+        JOIN courses c ON c.id = m.course_id
+        WHERE a.id = ${id}
+      `;
+      if (fresh) {
+        await notifyCourseStudents(before.course_id, {
+          type: 'assignment',
+          title: 'New assignment',
+          message: `${fresh.title}${fresh.code ? ` (${fresh.code})` : ''} is due ${formatManila(fresh.due_date as string)}`,
+          link: `/assignments/${id}`,
+        });
+      }
+    } catch (err) {
+      console.error('[assignments] could not notify students:', err);
+    }
+  }
 
   const [assignment] = await queryAssignments(user, { id });
   res.json({ assignment });
@@ -294,7 +326,9 @@ export async function removeAttachment(req: Request, res: Response): Promise<voi
 
 /** GET /api/assignments/:id/attachment — a short-lived signed link, for anyone who can see the assignment. */
 export async function downloadAttachment(req: Request, res: Response): Promise<void> {
+  const user = currentUser(req);
   const id = parseUuid(req.params.id, 'assignment id');
+  await assertCanViewAssignment(user, id);
   const [row] = await sql`SELECT attachment_public_id, attachment_name FROM assignments WHERE id = ${id}`;
   if (!row) throw httpError(404, 'Assignment not found');
   if (!row.attachment_public_id) throw httpError(404, 'This assignment has no material file');

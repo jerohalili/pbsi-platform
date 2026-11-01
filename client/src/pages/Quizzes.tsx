@@ -28,7 +28,7 @@ export default function QuizzesPage() {
   const { data, isLoading, isError, refetch } = useGet<{ quizzes: QuizItem[] }>(
     ['quizzes', 'list', courseId],
     courseId ? `/quizzes?course_id=${courseId}` : '/quizzes',
-    { keepPreviousData: true },
+    { keepPreviousData: true, staleTime: 0, refetchOnMount: 'always' },
   );
 
   const courses = courseData?.courses ?? [];

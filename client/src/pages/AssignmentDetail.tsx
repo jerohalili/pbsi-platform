@@ -54,6 +54,8 @@ export default function AssignmentDetailPage() {
   const [editing, setEditing] = useState(false);
   const [gradeTarget, setGradeTarget] = useState<GradeTarget | null>(null);
   const [deletingAssignment, setDeletingAssignment] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [publishError, setPublishError] = useState('');
 
   // Student hand-in form: either an uploaded file or a link
   const [handInMode, setHandInMode] = useState<'file' | 'link'>('file');
@@ -155,6 +157,20 @@ export default function AssignmentDetailPage() {
       toast({ title: 'Couldn’t download the file', description: getErrorMessage(err), variant: 'destructive' }),
     );
 
+  const togglePublish = async () => {
+    setPublishing(true);
+    setPublishError('');
+    try {
+      await api.patch(`/assignments/${assignment.id}`, { is_published: !assignment.is_published });
+      toast({ title: assignment.is_published ? 'Assignment unpublished' : 'Assignment published', variant: 'success' });
+      refreshAll();
+    } catch (err) {
+      setPublishError(getErrorMessage(err));
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   const confirmDeleteAssignment = async () => {
     await api.delete(`/assignments/${assignment.id}`);
     toast({ title: 'Assignment deleted', variant: 'success' });
@@ -177,6 +193,11 @@ export default function AssignmentDetailPage() {
           <div className="space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
               <Badge variant="outline">{assignment.course_code}</Badge>
+              {canManage && (
+                <Badge variant={assignment.is_published ? 'success' : 'warning'}>
+                  {assignment.is_published ? 'Published' : 'Draft'}
+                </Badge>
+              )}
               <span className="text-sm text-muted-foreground">{assignment.module_title}</span>
             </div>
             <h1 className="text-2xl font-bold">{assignment.title}</h1>
@@ -204,7 +225,19 @@ export default function AssignmentDetailPage() {
             </div>
           </div>
           {canManage && (
-            <div className="flex gap-2 shrink-0">
+            <div className="flex gap-2 shrink-0 flex-wrap">
+              <Button
+                onClick={togglePublish}
+                disabled={publishing || (assignment.is_published && (assignment.submitted_count ?? 0) > 0)}
+                variant={assignment.is_published ? 'outline' : 'default'}
+                title={
+                  assignment.is_published && (assignment.submitted_count ?? 0) > 0
+                    ? 'Students have already handed in work, so it can no longer be unpublished.'
+                    : undefined
+                }
+              >
+                {assignment.is_published ? 'Unpublish' : 'Publish'}
+              </Button>
               <Button onClick={() => setEditing(true)}>
                 <Pencil className="w-4 h-4 mr-2" /> Edit
               </Button>
@@ -216,6 +249,12 @@ export default function AssignmentDetailPage() {
             </div>
           )}
         </div>
+        {publishError && <p className="text-sm text-destructive">{publishError}</p>}
+        {canManage && !assignment.is_published && (
+          <p className="text-sm text-muted-foreground">
+            This assignment is a draft. Students can’t see it, and won’t be notified, until you publish it.
+          </p>
+        )}
       </div>
 
       {isStudent && (

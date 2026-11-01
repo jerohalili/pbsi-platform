@@ -29,6 +29,26 @@ export async function getOwnTeacherId(userId: string): Promise<string | null> {
 }
 
 /**
+ * Students see only the courses they are enrolled in. For a student this answers 404 (so the
+ * course does not reveal itself) unless they are enrolled; teachers and admins are not restricted
+ * here (what they may change is decided by assertCanManageCourse).
+ */
+export async function assertEnrolledIfStudent(
+  user: AuthUser,
+  courseId: string,
+  notFoundMessage = 'Course not found',
+): Promise<void> {
+  if (user.role !== 'student') return;
+  const [row] = await sql`
+    SELECT 1 AS ok
+    FROM enrollments e
+    JOIN students st ON st.id = e.student_id
+    WHERE e.course_id = ${parseUuid(courseId, 'course id')} AND st.user_id = ${user.id}
+  `;
+  if (!row) throw httpError(404, notFoundMessage);
+}
+
+/**
  * Admins may manage any course; teachers only the courses they teach.
  * Throws 404 when the course does not exist and 403 when it belongs to someone else.
  */
@@ -99,6 +119,7 @@ export interface ManagedAssignment {
   max_score: number;
   due_date: string;
   course_id: string;
+  is_published: boolean;
 }
 
 /**
@@ -110,7 +131,7 @@ export async function assertCanManageAssignment(
   assignmentId: string,
 ): Promise<ManagedAssignment> {
   const [a] = await sql`
-    SELECT a.id, a.title, a.max_score::float8 AS max_score, a.due_date,
+    SELECT a.id, a.title, a.max_score::float8 AS max_score, a.due_date, a.is_published,
            m.course_id, te.user_id AS teacher_user_id
     FROM assignments a
     JOIN modules m ON m.id = a.module_id
@@ -128,7 +149,46 @@ export async function assertCanManageAssignment(
     max_score: a.max_score as number,
     due_date: a.due_date as string,
     course_id: a.course_id as string,
+    is_published: a.is_published as boolean,
   };
+}
+
+/**
+ * Who may open an assignment (its page, its material file): a draft is visible only to the teacher
+ * who owns the course and to admins; a published assignment to everyone allowed to see it.
+ * Answers 404 either way, so a draft never reveals that it exists.
+ */
+export async function assertCanViewAssignment(user: AuthUser, assignmentId: string): Promise<void> {
+  const [a] = await sql`
+    SELECT a.is_published, m.course_id, te.user_id AS teacher_user_id
+    FROM assignments a
+    JOIN modules m ON m.id = a.module_id
+    JOIN courses c ON c.id = m.course_id
+    JOIN teachers te ON te.id = c.teacher_id
+    WHERE a.id = ${assignmentId}
+  `;
+  if (!a) throw httpError(404, 'Assignment not found');
+  const owner = user.role === 'admin' || (user.role === 'teacher' && a.teacher_user_id === user.id);
+  if (!owner && a.is_published !== true) throw httpError(404, 'Assignment not found');
+  await assertEnrolledIfStudent(user, a.course_id as string, 'Assignment not found');
+}
+
+/**
+ * A student may hand in work only for a published assignment of a course they are enrolled in.
+ * Answers 404 otherwise, so a draft or someone else's course never reveals that it exists.
+ */
+export async function assertStudentCanHandIn(studentId: string, assignmentId: string): Promise<void> {
+  const [a] = await sql`
+    SELECT a.id
+    FROM assignments a
+    JOIN modules m ON m.id = a.module_id
+    WHERE a.id = ${assignmentId}
+      AND a.is_published = TRUE
+      AND EXISTS (
+        SELECT 1 FROM enrollments e WHERE e.course_id = m.course_id AND e.student_id = ${studentId}
+      )
+  `;
+  if (!a) throw httpError(404, 'Assignment not found');
 }
 
 export interface ManagedQuiz {

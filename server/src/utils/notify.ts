@@ -29,26 +29,27 @@ export async function notifyUsers(userIds: Iterable<string>, content: Notificati
   }
 }
 
-/**
- * User ids of every active student. Students are not enrolled per course in this system, so
- * anything students should hear about (a new assignment, a published quiz) goes to all of them.
- */
-export async function activeStudentUserIds(): Promise<string[]> {
+/** User ids of the active students enrolled in one course. */
+export async function courseStudentUserIds(courseId: string): Promise<string[]> {
   const rows = await sql`
     SELECT st.user_id
-    FROM students st
+    FROM enrollments e
+    JOIN students st ON st.id = e.student_id
     JOIN users u ON u.id = st.user_id
-    WHERE u.is_active = TRUE
+    WHERE e.course_id = ${courseId} AND u.is_active = TRUE
   `;
   return rows.map((row) => row.user_id as string);
 }
 
-/** Notifies every active student. Best effort, like notifyUsers (the lookup is covered too). */
-export async function notifyAllStudents(content: NotificationContent): Promise<void> {
+/**
+ * Notifies the active students enrolled in a course (a new assignment, a published quiz).
+ * Best effort, like notifyUsers (the lookup is covered too).
+ */
+export async function notifyCourseStudents(courseId: string, content: NotificationContent): Promise<void> {
   try {
-    await notifyUsers(await activeStudentUserIds(), content);
+    await notifyUsers(await courseStudentUserIds(courseId), content);
   } catch (err) {
-    console.error(`[notify] could not look up students for "${content.type}" notification:`, err);
+    console.error(`[notify] could not look up students for \"${content.type}\" notification:`, err);
   }
 }
 

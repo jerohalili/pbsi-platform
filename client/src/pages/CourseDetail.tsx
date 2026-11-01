@@ -27,6 +27,7 @@ import { Badge } from '@/components/ui/badge.tsx';
 import { Card } from '@/components/ui/card.tsx';
 import { Skeleton } from '@/components/ui/skeleton.tsx';
 import { CourseFormDialog, CourseFormValues } from '@/components/courses/CourseFormDialog.tsx';
+import { CourseStudentsSection } from '@/components/courses/CourseStudentsSection.tsx';
 import { ModuleFormDialog, ModuleFormValues } from '@/components/courses/ModuleFormDialog.tsx';
 import { ModuleContentViewer } from '@/components/courses/ModuleContentViewer.tsx';
 import { ConfirmDialog } from '@/components/users/ConfirmDialog.tsx';
@@ -86,13 +87,14 @@ export default function CourseDetailPage() {
   const { data, isLoading, isError, refetch } = useGet<{ course: Course; modules: Module[] }>(
     ['course', id ?? ''],
     `/courses/${id}`,
-    { enabled: !!id },
+    // Enrollment and publishing change what a student may open, so always ask the server again.
+    { enabled: !!id, staleTime: 0, refetchOnMount: 'always' },
   );
 
   const { data: assignmentData } = useGet<{ assignments: AssignmentItem[] }>(
     ['assignments', 'course', id ?? ''],
     `/assignments?course_id=${id}`,
-    { enabled: !!id },
+    { enabled: !!id, staleTime: 0, refetchOnMount: 'always' },
   );
   const assignmentsByModule = (assignmentData?.assignments ?? []).reduce<Record<string, AssignmentItem[]>>(
     (acc, a) => {
@@ -106,7 +108,7 @@ export default function CourseDetailPage() {
   const { data: quizData } = useGet<{ quizzes: QuizItem[] }>(
     ['quizzes', 'course', id ?? ''],
     `/quizzes?course_id=${id}`,
-    { enabled: !!id },
+    { enabled: !!id, staleTime: 0, refetchOnMount: 'always' },
   );
   const quizzes = quizData?.quizzes ?? [];
 
@@ -507,6 +509,9 @@ export default function CourseDetailPage() {
                           {a.title}
                         </Link>
                       )}
+                      {(!isStudent && a.can_manage) && (
+                        <Badge variant={a.is_published ? 'success' : 'warning'}>{a.is_published ? 'Published' : 'Draft'}</Badge>
+                      )}
                       <span className="text-xs text-muted-foreground truncate">Module: {a.module_title}</span>
                     </div>
                     <p className="text-sm text-muted-foreground">
@@ -552,6 +557,8 @@ export default function CourseDetailPage() {
         )}
       </section>
 
+      {canEdit && <CourseStudentsSection courseId={course.id} courseCode={course.code} />}
+
       <CourseFormDialog
         open={editingCourse}
         onOpenChange={setEditingCourse}
@@ -589,7 +596,11 @@ export default function CourseDetailPage() {
         modules={modules.map((m) => ({ id: m.id, title: m.title }))}
         onSaved={() => {
           refresh();
-          toast({ title: 'Assignment created', variant: 'success' });
+          toast({
+            title: 'Assignment created as a draft',
+            description: 'Open it and press Publish when students should see it.',
+            variant: 'success',
+          });
         }}
       />
 

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, ClipboardList } from 'lucide-react';
 import useAuth from '@/hooks/useAuth.ts';
 import { useGet } from '@/hooks/useApi.ts';
+import { Badge } from '@/components/ui/badge.tsx';
 import { Button } from '@/components/ui/button.tsx';
 import { Card } from '@/components/ui/card.tsx';
 import { Skeleton } from '@/components/ui/skeleton.tsx';
@@ -29,7 +30,7 @@ export default function AssignmentsPage() {
   const { data, isLoading, isError, refetch } = useGet<{ assignments: AssignmentItem[] }>(
     ['assignments', 'list', courseId],
     courseId ? `/assignments?course_id=${courseId}` : '/assignments',
-    { keepPreviousData: true },
+    { keepPreviousData: true, staleTime: 0, refetchOnMount: 'always' },
   );
 
   const courses = courseData?.courses ?? [];
@@ -116,8 +117,11 @@ export default function AssignmentsPage() {
                         {a.title}
                       </Link>
                     )}
-                    <div className="text-sm text-muted-foreground">
-                      {a.course_code} · {a.module_title}
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span>
+                        {a.course_code} · {a.module_title}
+                      </span>
+                      {!isStudent && a.can_manage && !a.is_published && <Badge variant="warning">Draft</Badge>}
                     </div>
                   </TableCell>
                   <TableCell className="text-sm">{formatDateTime(a.due_date)}</TableCell>

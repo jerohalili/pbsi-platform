@@ -17,7 +17,7 @@ import {
 } from '../utils/access.js';
 import { newTimeOrderedUuid } from '../utils/ids.js';
 import { recordAudit, diffValues } from '../utils/audit.js';
-import { notifyAllStudents } from '../utils/notify.js';
+import { notifyCourseStudents } from '../utils/notify.js';
 import {
   deleteFromCloudinary,
   deleteManyFromCloudinary,
@@ -39,7 +39,8 @@ interface QuizFilters {
 
 /**
  * Quizzes as seen by the signed-in person. Drafts are visible only to the teacher who owns
- * the course (and admins). Students also get their own attempt; managers get class-wide numbers.
+ * the course (and admins), and students see only the courses they are enrolled in.
+ * Students also get their own attempt; managers get class-wide numbers.
  */
 async function queryQuizzes(user: AuthUser, filters: QuizFilters) {
   const isStudent = user.role === 'student';
@@ -67,6 +68,9 @@ async function queryQuizzes(user: AuthUser, filters: QuizFilters) {
     WHERE (${filters.id ?? ''}::text = '' OR q.id = NULLIF(${filters.id ?? ''}::text, '')::uuid)
       AND (${filters.courseId ?? ''}::text = '' OR q.course_id = NULLIF(${filters.courseId ?? ''}::text, '')::uuid)
       AND (q.is_published = TRUE OR te.user_id = ${user.id} OR ${user.role === 'admin'}::boolean)
+      AND (${!isStudent}::boolean OR EXISTS (
+            SELECT 1 FROM enrollments en WHERE en.course_id = q.course_id AND en.student_id = ${ownStudentId}::uuid
+          ))
     ORDER BY q.created_at DESC
   `;
 
@@ -177,7 +181,7 @@ export async function updateQuiz(req: Request, res: Response): Promise<void> {
   if (before.is_published === false && input.is_published === true) {
     try {
       const [course] = await sql`SELECT code FROM courses WHERE id = ${before.course_id}`;
-      await notifyAllStudents({
+      await notifyCourseStudents(before.course_id, {
         type: 'quiz',
         title: 'Quiz available',
         message: `${input.title ?? before.title}${course?.code ? ` (${course.code})` : ''} is now open`,

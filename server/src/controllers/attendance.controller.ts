@@ -26,6 +26,24 @@ async function assertNotFutureDate(date: string): Promise<void> {
   if (row?.is_future) throw httpError(400, 'Attendance cannot be recorded for a future date');
 }
 
+/**
+ * Attendance is taken for the students enrolled in the course. A student who was removed from the
+ * course after being marked on that day can still be corrected, so the day's history stays editable.
+ */
+async function assertRosterStudents(courseId: string, date: string, studentIds: string[]): Promise<void> {
+  const rows = await sql`
+    SELECT s AS id
+    FROM unnest(${studentIds}::uuid[]) AS s
+    WHERE NOT EXISTS (SELECT 1 FROM enrollments e WHERE e.course_id = ${courseId} AND e.student_id = s)
+      AND NOT EXISTS (
+        SELECT 1 FROM attendance a WHERE a.course_id = ${courseId} AND a.student_id = s AND a.date = ${date}::date
+      )
+  `;
+  if (rows.length > 0) {
+    throw httpError(409, 'Some of these students are not enrolled in this course. Refresh the page and try again.');
+  }
+}
+
 export async function listAttendance(_req: Request, res: Response): Promise<void> {
   const { course_id, date, student_id } = _req.query as {
     course_id?: string;
@@ -77,9 +95,9 @@ export async function listAttendance(_req: Request, res: Response): Promise<void
 }
 
 /**
- * The class list for taking attendance: every active student, with the status already saved
- * for this course and date (null = not marked yet). Students are not enrolled per course in
- * this system, so the roster is the whole active student body.
+ * The class list for taking attendance: every active student enrolled in the course, with the
+ * status already saved for this course and date (null = not marked yet). A student who was
+ * marked that day and has since been removed from the course stays on that day's list.
  */
 export async function getRoster(req: Request, res: Response): Promise<void> {
   const user = req.user as AuthUser;
@@ -100,7 +118,11 @@ export async function getRoster(req: Request, res: Response): Promise<void> {
     JOIN profiles p ON p.user_id = u.id
     LEFT JOIN attendance a
            ON a.student_id = st.id AND a.course_id = ${courseId} AND a.date = ${dateParam}::date
-    WHERE u.is_active = TRUE
+    WHERE (
+            u.is_active = TRUE
+            AND EXISTS (SELECT 1 FROM enrollments e WHERE e.student_id = st.id AND e.course_id = ${courseId})
+          )
+       OR a.id IS NOT NULL
     ORDER BY p.last_name ASC, p.first_name ASC
   `;
   res.json({ students });
@@ -139,6 +161,7 @@ export async function markAttendance(req: Request, res: Response): Promise<void>
 
   await assertCanManageCourse(user, course_id);
   await assertNotFutureDate(date);
+  await assertRosterStudents(course_id, date, [student_id]);
 
   const [previous] = await sql`
     SELECT id, status FROM attendance
@@ -191,6 +214,7 @@ export async function markAttendanceBulk(req: Request, res: Response): Promise<v
 
   await assertCanManageCourse(user, course_id);
   await assertNotFutureDate(date);
+  await assertRosterStudents(course_id, date, ids);
 
   const existingRows = await sql`
     SELECT id, student_id, status FROM attendance

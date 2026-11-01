@@ -7,6 +7,8 @@ export interface AssignmentItem {
   title: string;
   instructions: string | null;
   due_date: string;
+  /** Drafts are visible only to the course's teacher and admins. */
+  is_published: boolean;
   max_score: number;
   attachment_url: string | null;
   /** A private material file uploaded by the teacher (separate from the link above). */

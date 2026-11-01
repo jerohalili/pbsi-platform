@@ -112,6 +112,12 @@ export async function listTimetable(req: Request, res: Response): Promise<void> 
     WHERE (${dayParam}::text = '' OR t.day_of_week = NULLIF(${dayParam}::text, '')::int)
       AND (${teacherParam}::text = '' OR t.teacher_id = NULLIF(${teacherParam}::text, '')::uuid)
       AND (${courseParam}::text = '' OR t.course_id = NULLIF(${courseParam}::text, '')::uuid)
+      AND (${user.role !== 'student'}::boolean OR t.course_id IN (
+            SELECT e.course_id
+            FROM enrollments e
+            JOIN students st ON st.id = e.student_id
+            WHERE st.user_id = ${user.id}
+          ))
     ORDER BY t.day_of_week ASC, t.period_number ASC, t.start_time ASC
   `;
   res.json({ timetable: entries });

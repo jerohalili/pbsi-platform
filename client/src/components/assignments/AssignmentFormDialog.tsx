@@ -128,6 +128,7 @@ export function AssignmentFormDialog({
           <DialogTitle>{mode === 'create' ? 'New assignment' : 'Edit assignment'}</DialogTitle>
           <DialogDescription>
             Students hand in a file or a link to their work. You can attach one material file and/or a link.
+            {mode === 'create' && ' New assignments start as drafts: students can’t see them until you publish.'}
           </DialogDescription>
         </DialogHeader>
 

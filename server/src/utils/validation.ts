@@ -107,7 +107,12 @@ export const createAssignmentSchema = z.object({
   attachment_url: z.string().trim().max(2000).optional(),
 });
 
-export const updateAssignmentSchema = createAssignmentSchema.omit({ module_id: true }).partial();
+export const updateAssignmentSchema = createAssignmentSchema
+  .omit({ module_id: true })
+  .partial()
+  // A real boolean on purpose (same as quizzes): z.coerce.boolean() would turn "false" into true.
+  // New assignments are always drafts, so this can only be sent when editing.
+  .extend({ is_published: z.boolean().optional() });
 
 export const submitAssignmentSchema = z.object({
   assignment_id: z.string().uuid('Invalid assignment ID'),
@@ -191,6 +196,14 @@ export const attendanceSchema = z.object({
   course_id: z.string().uuid('Invalid course ID'),
   date: z.string().date('Invalid date'),
   status: attendanceStatusSchema,
+});
+
+/** Teachers/admins enroll one or more students in a course. */
+export const enrollStudentsSchema = z.object({
+  student_ids: z
+    .array(z.string().uuid('Invalid student ID'))
+    .min(1, 'Choose at least one student')
+    .max(500, 'Too many students in one request'),
 });
 
 /** One class session: every student's status for a course on a date, saved together. */
@@ -318,6 +331,7 @@ export type CreateAssignmentInput = z.infer<typeof createAssignmentSchema>;
 export type GradeSubmissionInput = z.infer<typeof gradeSubmissionSchema>;
 export type AttendanceInput = z.infer<typeof attendanceSchema>;
 export type BulkAttendanceInput = z.infer<typeof bulkAttendanceSchema>;
+export type EnrollStudentsInput = z.infer<typeof enrollStudentsSchema>;
 export type TimetableInput = z.infer<typeof timetableSchema>;
 export type TimetableUpdateInput = z.infer<typeof timetableUpdateSchema>;
 export type NotificationInput = z.infer<typeof notificationSchema>;

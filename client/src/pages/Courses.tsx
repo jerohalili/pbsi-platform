@@ -33,6 +33,8 @@ export default function CoursesPage() {
   const { data, isLoading, isError, refetch } = useGet<{ courses: Course[] }>(
     ['courses'],
     '/courses',
+    // A student's list changes when a teacher enrolls or removes them, so don't serve it stale.
+    { staleTime: 0, refetchOnMount: 'always' },
   );
 
   const isAdmin = user?.role === 'admin';
@@ -71,8 +73,12 @@ export default function CoursesPage() {
       ) : courses.length === 0 ? (
         <Card className="p-10 text-center text-muted-foreground">
           <BookOpen className="w-8 h-8 mx-auto mb-3 opacity-60" />
-          <p>No courses yet.</p>
-          {canCreate && <p className="text-sm mt-1">Use “New Course” to create the first one.</p>}
+          <p>{canCreate ? 'No courses yet.' : 'You’re not enrolled in any courses yet.'}</p>
+          {canCreate ? (
+            <p className="text-sm mt-1">Use “New Course” to create the first one.</p>
+          ) : (
+            <p className="text-sm mt-1">Your teacher or an administrator will add you to your courses.</p>
+          )}
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

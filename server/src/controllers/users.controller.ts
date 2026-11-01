@@ -505,6 +505,7 @@ export async function deleteUser(req: Request, res: Response): Promise<void> {
       sql`DELETE FROM attendance WHERE student_id IN (SELECT id FROM students WHERE user_id = ${id})`,
       sql`DELETE FROM submissions WHERE student_id IN (SELECT id FROM students WHERE user_id = ${id})`,
       sql`DELETE FROM quiz_attempts WHERE student_id IN (SELECT id FROM students WHERE user_id = ${id})`,
+      sql`DELETE FROM enrollments WHERE student_id IN (SELECT id FROM students WHERE user_id = ${id})`,
       // Other people's replies to this account's replies stay, as top-level replies.
       sql`UPDATE discussion_replies SET parent_reply_id = NULL
           WHERE parent_reply_id IN (SELECT id FROM discussion_replies WHERE author_id = ${id})`,

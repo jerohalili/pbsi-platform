@@ -7,7 +7,7 @@ import {
   updateReplySchema,
   updateThreadSchema,
 } from '../utils/validation.js';
-import { httpError, parseUuid } from '../utils/access.js';
+import { assertEnrolledIfStudent, httpError, parseUuid } from '../utils/access.js';
 import { recordAudit } from '../utils/audit.js';
 import { notifyUsers } from '../utils/notify.js';
 import type { AuthUser } from '../types/index.js';
@@ -102,7 +102,9 @@ function shorten(text: string, max = 80): string {
 
 /** GET /api/discussions/:course_id — the discussions of one course, pinned first, then most recent activity. */
 export async function listThreads(req: Request, res: Response): Promise<void> {
+  const user = currentUser(req);
   const courseId = parseUuid(req.params.course_id, 'course id');
+  await assertEnrolledIfStudent(user, courseId);
 
   const [course] = await sql`SELECT id FROM courses WHERE id = ${courseId}`;
   if (!course) throw httpError(404, 'Course not found');
@@ -131,6 +133,7 @@ export async function getThread(req: Request, res: Response): Promise<void> {
   const user = currentUser(req);
   const threadId = parseUuid(req.params.thread_id, 'discussion id');
   const { course_teacher_user_id, ...thread } = await fetchThread(threadId);
+  await assertEnrolledIfStudent(user, thread.course_id, 'Discussion not found');
 
   res.json({
     thread: {
@@ -148,6 +151,7 @@ export async function createThread(req: Request, res: Response): Promise<void> {
 
   const [course] = await sql`SELECT id, code, teacher_id FROM courses WHERE id = ${input.course_id}`;
   if (!course) throw httpError(404, 'Course not found');
+  await assertEnrolledIfStudent(user, input.course_id);
 
   const [thread] = await sql`
     INSERT INTO discussion_threads (course_id, title, body, author_id)
@@ -260,8 +264,10 @@ export async function deleteThread(req: Request, res: Response): Promise<void> {
 
 /** GET /api/discussions/:thread_id/replies — oldest first. Removed replies come back as placeholders without text. */
 export async function listReplies(req: Request, res: Response): Promise<void> {
+  const user = currentUser(req);
   const threadId = parseUuid(req.params.thread_id, 'discussion id');
-  await fetchThread(threadId);
+  const thread = await fetchThread(threadId);
+  await assertEnrolledIfStudent(user, thread.course_id, 'Discussion not found');
 
   const replies = await sql`
     SELECT dr.id, dr.thread_id, dr.author_id, dr.parent_reply_id,
@@ -286,6 +292,7 @@ export async function createReply(req: Request, res: Response): Promise<void> {
   const threadId = parseUuid(req.params.thread_id, 'discussion id');
   const input = createReplySchema.parse(req.body);
   const thread = await fetchThread(threadId);
+  await assertEnrolledIfStudent(user, thread.course_id, 'Discussion not found');
 
   if (thread.is_locked && !canModerate(user, thread.course_teacher_user_id)) {
     throw httpError(403, 'This discussion is locked');

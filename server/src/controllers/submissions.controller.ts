@@ -5,6 +5,7 @@ import { gradeSubmissionSchema, submitAssignmentSchema } from '../utils/validati
 import {
   assertCanManageAssignment,
   assertHttpUrl,
+  assertStudentCanHandIn,
   getOwnStudentId,
   httpError,
   parseUuid,
@@ -55,8 +56,9 @@ async function notifyTeacherOfHandIn(studentUserId: string, assignmentId: string
 }
 
 /**
- * Teacher view of one assignment: every active student, with their submission if they
- * made one ("missing" otherwise). A student who was deactivated still shows up if they submitted.
+ * Teacher view of one assignment: every active student enrolled in the course, with their
+ * submission if they made one ("missing" otherwise). Someone who handed in work still shows up
+ * after being deactivated or removed from the course, so their work is never hidden.
  */
 export async function listSubmissions(req: Request, res: Response): Promise<void> {
   const user = currentUser(req);
@@ -84,7 +86,13 @@ export async function listSubmissions(req: Request, res: Response): Promise<void
       ORDER BY s.submitted_at DESC
       LIMIT 1
     ) sub ON TRUE
-    WHERE u.is_active = TRUE OR sub.id IS NOT NULL
+    WHERE (
+            u.is_active = TRUE
+            AND EXISTS (
+              SELECT 1 FROM enrollments e WHERE e.student_id = st.id AND e.course_id = ${assignment.course_id}
+            )
+          )
+       OR sub.id IS NOT NULL
     ORDER BY p.last_name ASC, p.first_name ASC
   `;
 
@@ -214,8 +222,7 @@ export async function createSubmission(req: Request, res: Response): Promise<voi
   const studentId = await getOwnStudentId(user.id);
   if (!studentId) throw httpError(404, 'Student profile not found');
 
-  const [assignment] = await sql`SELECT id FROM assignments WHERE id = ${input.assignment_id}`;
-  if (!assignment) throw httpError(404, 'Assignment not found');
+  await assertStudentCanHandIn(studentId, input.assignment_id);
 
   const previous = await findOwnSubmission(input.assignment_id, studentId);
   const submission = await saveHandIn(input.assignment_id, studentId, {
@@ -249,8 +256,7 @@ export async function createFileSubmission(req: Request, res: Response): Promise
   const studentId = await getOwnStudentId(user.id);
   if (!studentId) throw httpError(404, 'Student profile not found');
 
-  const [assignment] = await sql`SELECT id FROM assignments WHERE id = ${assignmentId}`;
-  if (!assignment) throw httpError(404, 'Assignment not found');
+  await assertStudentCanHandIn(studentId, assignmentId);
 
   // Refuse before uploading anything when the work is already graded.
   const previous = await findOwnSubmission(assignmentId, studentId);

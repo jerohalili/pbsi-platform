@@ -12,6 +12,7 @@ import { deleteFromCloudinary } from '../utils/upload.js';
 import {
   assertCanManageCourse,
   assertCanManageModule,
+  assertEnrolledIfStudent,
   assertHttpUrl,
   httpError,
   parseUuid,
@@ -19,6 +20,8 @@ import {
 
 export async function listModules(req: Request, res: Response): Promise<void> {
   const { course_id } = req.params as { course_id: string };
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  await assertEnrolledIfStudent(req.user, parseUuid(course_id, 'course id'));
 
   const modules = await sql`
     SELECT m.id, m.course_id, m.title, m.rich_description, m.video_url,
@@ -44,6 +47,8 @@ export async function getModule(req: Request, res: Response): Promise<void> {
     err.statusCode = 404;
     throw err;
   }
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  await assertEnrolledIfStudent(req.user, module.course_id as string, 'Module not found');
   res.json({ module });
 }
 
@@ -128,8 +133,10 @@ export async function listModuleContents(req: Request, res: Response): Promise<v
   const { module_id } = req.params as { module_id: string };
   parseUuid(module_id, 'module id');
 
-  const [module] = await sql`SELECT id FROM modules WHERE id = ${module_id}`;
+  const [module] = await sql`SELECT id, course_id FROM modules WHERE id = ${module_id}`;
   if (!module) throw httpError(404, 'Module not found');
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  await assertEnrolledIfStudent(req.user, module.course_id as string, 'Module not found');
 
   const contents = await sql`
     SELECT id, module_id, type, title, content, url, cloudinary_public_id, resource_type,
