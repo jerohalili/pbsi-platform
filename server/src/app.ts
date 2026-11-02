@@ -9,6 +9,7 @@ import {
   refreshLimiter,
 } from './middleware/rateLimiters.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { requireTrustedOrigin } from './middleware/trustedOrigin.js';
 import authRoutes from './routes/auth.routes.js';
 import userRoutes from './routes/users.routes.js';
 import studentRoutes from './routes/students.routes.js';
@@ -44,8 +45,11 @@ app.use(
     exposedHeaders: ['Retry-After'],
   }),
 );
+// Refuse state-changing requests made by other websites (see the middleware for why).
+app.use('/api', requireTrustedOrigin);
+// Only JSON bodies (and multipart uploads, handled by multer): the form-encoded type a cross-site
+// <form> can send without a CORS preflight is deliberately not parsed.
 app.use(express.json({ limit: '10kb' }));
-app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 // Rate limiting (see middleware/rateLimiters.ts for the rules and the numbers)
 app.use('/api/auth/login', loginNetworkLimiter, loginAccountLimiter);

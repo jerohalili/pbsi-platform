@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { sql } from '../config/db.js';
 import type { AppError } from '../middleware/errorHandler.js';
 import { parseUuid } from '../utils/access.js';
+import { CSV_BOM, csvCell } from '../utils/csv.js';
 
 export async function listStudents(_req: Request, res: Response): Promise<void> {
   const { search, subject } = _req.query as {
@@ -87,19 +88,14 @@ export async function exportStudents(_req: Request, res: Response): Promise<void
   const csv = [
     headers.join(','),
     ...students.map((row) =>
-      headers
-        .map((h) => {
-          const v = row[h];
-          return v == null ? '' : `"${String(v).replace(/"/g, '""')}"`;
-        })
-        .join(','),
+      headers.map((h) => csvCell(row[h])).join(','),
     ),
   ].join('\n');
 
-  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader(
     'Content-Disposition',
     'attachment; filename="students_export.csv"',
   );
-  res.send(csv);
+  res.send(CSV_BOM + csv);
 }

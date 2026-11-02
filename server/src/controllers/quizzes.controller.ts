@@ -18,6 +18,7 @@ import {
 import { newTimeOrderedUuid } from '../utils/ids.js';
 import { recordAudit, diffValues } from '../utils/audit.js';
 import { notifyCourseStudents } from '../utils/notify.js';
+import { autoSubmitExpired } from '../utils/quizSessions.js';
 import {
   deleteFromCloudinary,
   deleteManyFromCloudinary,
@@ -45,6 +46,10 @@ interface QuizFilters {
 async function queryQuizzes(user: AuthUser, filters: QuizFilters) {
   const isStudent = user.role === 'student';
   const ownStudentId = isStudent ? await getOwnStudentId(user.id) : null;
+
+  // Timed attempts whose time ran out while the student was away are closed first, so the scores,
+  // counts and "completed" status below are already up to date.
+  await autoSubmitExpired({ quizId: filters.id, studentId: ownStudentId ?? undefined });
 
   const rows = await sql`
     SELECT q.id, q.course_id, q.title, q.time_limit_minutes, q.is_published, q.created_at,
@@ -115,11 +120,28 @@ export async function getQuiz(req: Request, res: Response): Promise<void> {
     ORDER BY id ASC
   `;
 
+  // A timed quiz keeps its questions back until the student presses Start, otherwise they could read
+  // them at leisure and only start the clock once they know the answers.
+  let visible = questions;
+  const { time_limit_minutes: timeLimit, attempt_id: attemptId } = quiz as unknown as {
+    time_limit_minutes: number | null;
+    attempt_id: string | null;
+  };
+  if (user.role === 'student' && timeLimit && !attemptId) {
+    const [started] = await sql`
+      SELECT 1 AS ok
+      FROM quiz_sessions s
+      JOIN students st ON st.id = s.student_id
+      WHERE s.quiz_id = ${id} AND st.user_id = ${user.id}
+    `;
+    if (!started) visible = [];
+  }
+
   res.json({
     quiz,
     questions: quiz.can_manage
-      ? questions
-      : questions.map(({ correct_answer: _hidden, ...safe }) => safe),
+      ? visible
+      : visible.map(({ correct_answer: _hidden, ...safe }) => safe),
   });
 }
 
@@ -207,6 +229,7 @@ export async function deleteQuiz(req: Request, res: Response): Promise<void> {
 
   // Cascade delete attempts before removing the quiz (questions go with ON DELETE CASCADE).
   await sql`DELETE FROM quiz_attempts WHERE quiz_id = ${id}`;
+  await sql`DELETE FROM quiz_sessions WHERE quiz_id = ${id}`;
   const [quiz] = await sql`DELETE FROM quizzes WHERE id = ${id} RETURNING id`;
   if (!quiz) throw httpError(404, 'Quiz not found');
   await deleteManyFromCloudinary(pictures.map((row) => row.image_public_id as string), 'image');

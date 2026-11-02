@@ -32,6 +32,29 @@ export function schemaProblems(rows: ColumnRow[]): string[] {
   return problems;
 }
 
+const TIMER_SCRIPT = 'server/sql/quiz-timer.sql';
+
+/** Stops the server at startup, with instructions, when the quiz timer table and column are missing. */
+export async function assertQuizTimerSchema(): Promise<void> {
+  const [row] = await sql`
+    SELECT to_regclass('quiz_sessions') IS NOT NULL AS has_sessions,
+           EXISTS (
+             SELECT 1 FROM information_schema.columns
+             WHERE table_schema = current_schema() AND table_name = 'quiz_attempts' AND column_name = 'auto_submitted'
+           ) AS has_flag
+  `;
+  const missing = [
+    row?.has_sessions ? null : 'table quiz_sessions',
+    row?.has_flag ? null : 'column quiz_attempts.auto_submitted',
+  ].filter(Boolean);
+  if (missing.length > 0) {
+    throw new Error(
+      `The database is not ready for the quiz timer (missing ${missing.join(' and ')}). ` +
+        `Run ${TIMER_SCRIPT} in the Neon SQL editor (safe to run more than once), then restart the server.`,
+    );
+  }
+}
+
 /** Stops the server at startup, with instructions, when the upload columns have not been added yet. */
 export async function assertUploadSchema(): Promise<void> {
   const rows = (await sql`

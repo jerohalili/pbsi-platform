@@ -14,6 +14,23 @@ import { Skeleton } from '@/components/ui/skeleton.tsx';
 import { ConfirmDialog } from '@/components/users/ConfirmDialog.tsx';
 import { QUESTION_TYPE_LABEL, type QuizItem, type QuizQuestion } from '@/components/quizzes/types.ts';
 
+/** What POST /quiz-attempts/start answers. */
+interface StartResponse {
+  /** The quiz was already submitted (for example the time ran out while the student was away). */
+  finished: boolean;
+  attempt_id?: string;
+  timed?: boolean;
+  /** Seconds left according to the SERVER's clock, so reloading the page never gives more time. */
+  remaining_seconds?: number | null;
+  /** What the student had typed before (restored after a reload or on another device). */
+  answers?: Record<string, string>;
+}
+
+/** How often the typed answers are saved while the student works. */
+const AUTOSAVE_DELAY_MS = 4000;
+/** If the automatic submit at zero fails (a dropped connection), try again this often. */
+const AUTO_SUBMIT_RETRY_MS = 5000;
+
 function formatCountdown(totalSeconds: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
@@ -35,6 +52,15 @@ export default function QuizTakePage() {
   const deadline = useRef<number | null>(null);
   const autoSubmitted = useRef(false);
   const submittedRef = useRef(false);
+  // The clock starts on the server when the page asks to begin; nothing is shown before that.
+  const [ready, setReady] = useState(false);
+  const [startError, setStartError] = useState('');
+  const [startAttempt, setStartAttempt] = useState(0);
+  const startedRef = useRef(false);
+  const lastSaved = useRef('');
+  const nextAutoRetry = useRef(0);
+  const answersRef = useRef(answers);
+  answersRef.current = answers;
 
   const { data, isLoading, isError, refetch } = useGet<{ quiz: QuizItem; questions: QuizQuestion[] }>(
     ['quiz', id ?? ''],
@@ -48,17 +74,24 @@ export default function QuizTakePage() {
   const unanswered = questions.length - answeredCount;
 
   /** Sends the answers. Throws when the server refuses so callers can show the message. */
-  const doSubmit = async (): Promise<void> => {
+  const doSubmit = async (auto = false): Promise<void> => {
     if (!quiz || submittedRef.current) return;
     setSubmitting(true);
     try {
-      const { data: result } = await api.post<{ attempt: { id: string } }>('/quiz-attempts', {
+      const { data: result } = await api.post<{ attempt: { id: string; auto_submitted: boolean } }>('/quiz-attempts', {
         quiz_id: quiz.id,
         answers,
+        ...(auto ? { auto: true } : {}),
       });
       submittedRef.current = true;
       queryClient.invalidateQueries('quiz');
       queryClient.invalidateQueries('quizzes');
+      if (result.attempt.auto_submitted) {
+        toast({
+          title: 'Time’s up',
+          description: 'Your answers were submitted automatically because the time limit ended.',
+        });
+      }
       navigate(`/quiz-results/${result.attempt.id}`, { replace: true });
     } catch (err) {
       // Already taken (for example in another tab): go to the quiz page instead of a dead end.
@@ -74,12 +107,21 @@ export default function QuizTakePage() {
     }
   };
 
-  const submitDirect = async () => {
+  const submitDirect = async (auto = false) => {
     setSubmitError('');
     try {
-      await doSubmit();
+      await doSubmit(auto);
     } catch (err) {
-      setSubmitError(getErrorMessage(err));
+      setSubmitError(
+        auto
+          ? `Time is up, but your answers could not be sent (${getErrorMessage(err)}). Trying again… If this keeps failing, what was last saved is submitted for you automatically.`
+          : getErrorMessage(err),
+      );
+      if (auto) {
+        // Let the countdown try again shortly instead of giving up at the deadline.
+        autoSubmitted.current = false;
+        nextAutoRetry.current = Date.now() + AUTO_SUBMIT_RETRY_MS;
+      }
     }
   };
 
@@ -88,13 +130,71 @@ export default function QuizTakePage() {
     else void submitDirect();
   };
 
-  // Start the countdown once, when the quiz has loaded.
+  // Ask the server to start the clock, once. For a timed quiz it answers with the time that is really
+  // left (the deadline is fixed on the server, so a reload or another device cannot restart it), the
+  // answers saved so far, and, only now, the questions.
   useEffect(() => {
-    if (quiz && quiz.status !== 'completed' && quiz.time_limit_minutes && deadline.current === null) {
-      deadline.current = Date.now() + quiz.time_limit_minutes * 60 * 1000;
-      setRemaining(quiz.time_limit_minutes * 60);
+    if (!quiz || quiz.status === 'completed' || startedRef.current) return;
+    if (user && user.role !== 'student') return;
+    startedRef.current = true;
+    setStartError('');
+    (async () => {
+      try {
+        const { data: started } = await api.post<StartResponse>('/quiz-attempts/start', { quiz_id: quiz.id });
+        if (started.finished && started.attempt_id) {
+          queryClient.invalidateQueries('quiz');
+          queryClient.invalidateQueries('quizzes');
+          toast({ title: 'This quiz is already submitted', description: 'The time limit had ended.' });
+          navigate(`/quiz-results/${started.attempt_id}`, { replace: true });
+          return;
+        }
+        if (started.timed && typeof started.remaining_seconds === 'number') {
+          deadline.current = Date.now() + started.remaining_seconds * 1000;
+          setRemaining(started.remaining_seconds);
+          const saved = started.answers ?? {};
+          lastSaved.current = JSON.stringify(saved);
+          setAnswers((prev) => ({ ...saved, ...prev }));
+          await refetch(); // the questions are only sent once the clock has started
+        }
+        setReady(true);
+      } catch (err) {
+        startedRef.current = false;
+        setStartError(getErrorMessage(err));
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quiz?.id, quiz?.status, user, startAttempt]);
+
+  /** Saves what has been typed (timed quizzes only) so it survives a closed tab, and counts if time runs out. */
+  const saveProgress = async (payload: Record<string, string>) => {
+    if (!quiz?.time_limit_minutes || submittedRef.current) return;
+    const json = JSON.stringify(payload);
+    if (json === lastSaved.current) return;
+    try {
+      await api.put('/quiz-attempts/progress', { quiz_id: quiz.id, answers: payload });
+      lastSaved.current = json;
+    } catch {
+      // Best effort: the next change tries again. A refusal means the time is over or it was submitted.
     }
-  }, [quiz]);
+  };
+
+  // Every few seconds after the last change...
+  useEffect(() => {
+    if (!ready || submittedRef.current || !quiz?.time_limit_minutes) return;
+    const timer = setTimeout(() => void saveProgress(answers), AUTOSAVE_DELAY_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [answers, ready]);
+
+  // ...and at once when the student leaves the page or switches app (phones suspend background tabs).
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === 'hidden' && ready) void saveProgress(answersRef.current);
+    };
+    document.addEventListener('visibilitychange', onHide);
+    return () => document.removeEventListener('visibilitychange', onHide);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, quiz?.id]);
 
   useEffect(() => {
     if (remaining === null) return;
@@ -102,9 +202,9 @@ export default function QuizTakePage() {
       if (deadline.current === null) return;
       const left = Math.max(0, Math.ceil((deadline.current - Date.now()) / 1000));
       setRemaining(left);
-      if (left === 0 && !autoSubmitted.current) {
+      if (left === 0 && !autoSubmitted.current && Date.now() >= nextAutoRetry.current) {
         autoSubmitted.current = true;
-        void submitDirect();
+        void submitDirect(true);
       }
     }, 1000);
     return () => clearInterval(timer);
@@ -154,6 +254,36 @@ export default function QuizTakePage() {
     return <Navigate to={`/quiz-results/${quiz.attempt_id}`} replace />;
   }
 
+  if (startError) {
+    return (
+      <div className="space-y-6">
+        {back}
+        <Card className="p-6 flex items-center justify-between gap-4">
+          <p className="text-sm text-muted-foreground">{startError}</p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              startedRef.current = false;
+              setStartAttempt((n) => n + 1);
+            }}
+          >
+            Try again
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!ready) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-10 w-72" />
+        <Skeleton className="h-40 w-full" />
+      </div>
+    );
+  }
+
   const setAnswer = (questionId: string, value: string) =>
     setAnswers((prev) => ({ ...prev, [questionId]: value }));
 
@@ -164,6 +294,7 @@ export default function QuizTakePage() {
           <h1 className="text-xl font-bold truncate">{quiz.title}</h1>
           <p className="text-xs text-muted-foreground">
             {answeredCount} of {questions.length} answered
+            {remaining !== null && ' · saved automatically'}
           </p>
         </div>
         {remaining !== null && (
@@ -247,7 +378,7 @@ export default function QuizTakePage() {
           title="Submit with unanswered questions?"
           description={`You haven’t answered ${unanswered} ${unanswered === 1 ? 'question' : 'questions'}. Unanswered questions score zero.`}
           confirmLabel="Submit anyway"
-          onConfirm={doSubmit}
+          onConfirm={() => doSubmit()}
         />
       )}
     </div>

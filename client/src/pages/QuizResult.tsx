@@ -1,5 +1,5 @@
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, XCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Clock, XCircle } from 'lucide-react';
 import { useGet } from '@/hooks/useApi.ts';
 import { formatDateTime } from '@/lib/utils.ts';
 import { Badge } from '@/components/ui/badge.tsx';
@@ -18,6 +18,8 @@ interface AttemptSummary {
   earned_points: number;
   total_points: number;
   submitted_at: string;
+  /** True when the time limit ended and the server submitted what the student had. */
+  auto_submitted: boolean;
   /** Only teachers/admins see whose attempt it is. */
   student_name: string | null;
 }
@@ -89,6 +91,19 @@ export default function QuizResultPage() {
           <h1 className="text-2xl font-bold">{attempt.quiz_title}</h1>
           <p className="text-sm text-muted-foreground">Taken {formatDateTime(attempt.submitted_at)}</p>
         </div>
+        {attempt.auto_submitted && (
+          <div
+            role="status"
+            className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-100 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-900 dark:text-amber-100"
+          >
+            <Clock className="w-5 h-5 shrink-0 mt-0.5" />
+            <p>
+              {attempt.student_name
+                ? 'This quiz was submitted automatically because the time limit ended. Only the answers saved before the deadline were graded.'
+                : 'Time ran out, so your quiz was submitted automatically at the deadline. Only the answers you had entered by then were graded; questions you hadn’t answered scored zero.'}
+            </p>
+          </div>
+        )}
         <Card className="p-6">
           <p className="text-3xl font-bold">{attempt.score}%</p>
           <p className="text-sm text-muted-foreground mt-1">

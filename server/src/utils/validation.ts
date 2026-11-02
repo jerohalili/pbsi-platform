@@ -14,8 +14,13 @@ export const registerSchema = z.object({
 // Optional text fields: an empty string means "clear this value".
 const optionalText = (max: number) => z.string().trim().max(max).optional();
 
+// Emails are compared without regard to capitalization (and phones love to capitalize), so they are
+// trimmed and stored in lower case. Accounts created before this keep their stored spelling; every
+// lookup matches lower(email), so they are found either way.
+const emailSchema = z.string().trim().toLowerCase().email('Invalid email address');
+
 export const createUserSchema = z.object({
-  email: z.string().trim().email('Invalid email address'),
+  email: emailSchema,
   password: z
     .string()
     .min(8, 'Password must be at least 8 characters')
@@ -63,7 +68,7 @@ export const changePasswordSchema = z.object({
 });
 
 export const loginSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  email: emailSchema,
   password: z.string().min(1, 'Password is required'),
 });
 
@@ -181,6 +186,20 @@ export const questionInputSchema = z
 export const submitQuizAttemptSchema = z.object({
   quiz_id: z.string().uuid('Invalid quiz ID'),
   // question id -> the student's answer
+  answers: z.record(z.string().max(2000)),
+  // The page sets this when the countdown reached zero. It only labels the attempt for the student
+  // and the teacher; whether the time really ran out is decided by the server's clock.
+  auto: z.boolean().optional(),
+});
+
+// Pressing Start on a timed quiz: the server begins the clock.
+export const startQuizAttemptSchema = z.object({
+  quiz_id: z.string().uuid('Invalid quiz ID'),
+});
+
+// The answers typed so far, saved while the student works (so they survive a closed tab).
+export const saveQuizProgressSchema = z.object({
+  quiz_id: z.string().uuid('Invalid quiz ID'),
   answers: z.record(z.string().max(2000)),
 });
 

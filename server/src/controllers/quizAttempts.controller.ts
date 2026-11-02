@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { sql } from '../config/db.js';
-import { submitQuizAttemptSchema } from '../utils/validation.js';
+import { saveQuizProgressSchema, startQuizAttemptSchema, submitQuizAttemptSchema } from '../utils/validation.js';
 import {
   assertCanManageQuiz,
   getOwnStudentId,
@@ -8,8 +8,8 @@ import {
   parseUuid,
   rethrowDbError,
 } from '../utils/access.js';
-import { gradeQuiz, isAnswerCorrect, type GradableQuestion } from '../utils/quizGrading.js';
-import { schoolYearTerm } from '../utils/gradeTerm.js';
+import { isAnswerCorrect, type GradableQuestion } from '../utils/quizGrading.js';
+import { SUBMIT_GRACE_SECONDS, autoSubmitExpired, cleanAnswers, recordAttempt } from '../utils/quizSessions.js';
 import type { AuthUser } from '../types/index.js';
 
 function currentUser(req: Request): AuthUser {
@@ -17,17 +17,11 @@ function currentUser(req: Request): AuthUser {
   return req.user;
 }
 
-/** A student submits their answers. The server grades them; the client never sends a score. */
-export async function submitQuizAttempt(req: Request, res: Response): Promise<void> {
-  const user = currentUser(req);
-  if (user.role !== 'student') throw httpError(403, 'Only students can take quizzes');
-
-  const input = submitQuizAttemptSchema.parse(req.body);
-
-  const studentId = await getOwnStudentId(user.id);
-  if (!studentId) throw httpError(404, 'Student profile not found');
-
-  const [quiz] = await sql`SELECT id, course_id, is_published FROM quizzes WHERE id = ${input.quiz_id}`;
+/** The quiz a student is allowed to take: published, and in a course they are enrolled in. */
+async function loadQuizForStudent(studentId: string, quizId: string) {
+  const [quiz] = await sql`
+    SELECT id, course_id, is_published, time_limit_minutes FROM quizzes WHERE id = ${quizId}
+  `;
   // An unpublished quiz does not exist as far as students are concerned.
   if (!quiz || quiz.is_published !== true) throw httpError(404, 'Quiz not found');
   // Neither does a quiz of a course the student is not enrolled in.
@@ -35,56 +29,153 @@ export async function submitQuizAttempt(req: Request, res: Response): Promise<vo
     SELECT 1 AS ok FROM enrollments WHERE course_id = ${quiz.course_id} AND student_id = ${studentId}
   `;
   if (!enrolled) throw httpError(404, 'Quiz not found');
+  return quiz as { id: string; course_id: string; is_published: boolean; time_limit_minutes: number | null };
+}
+
+async function studentIdOf(user: AuthUser): Promise<string> {
+  if (user.role !== 'student') throw httpError(403, 'Only students can take quizzes');
+  const studentId = await getOwnStudentId(user.id);
+  if (!studentId) throw httpError(404, 'Student profile not found');
+  return studentId;
+}
+
+/**
+ * A student presses Start. For a timed quiz this is when the SERVER's clock begins: the deadline is
+ * fixed on the first call and every later call (a reload, another tab, another phone) gets the same
+ * deadline back together with the answers saved so far. Quizzes without a time limit need no
+ * session. A student whose time already ran out is told so, and their attempt is on record.
+ */
+export async function startQuizAttempt(req: Request, res: Response): Promise<void> {
+  const user = currentUser(req);
+  const studentId = await studentIdOf(user);
+  const input = startQuizAttemptSchema.parse(req.body);
+  const quiz = await loadQuizForStudent(studentId, input.quiz_id);
+
+  // Time that ran out while the student was away turns into their attempt before anything else.
+  await autoSubmitExpired({ quizId: quiz.id, studentId });
+  const [done] = await sql`
+    SELECT id FROM quiz_attempts WHERE quiz_id = ${quiz.id} AND student_id = ${studentId} LIMIT 1
+  `;
+  if (done) {
+    res.json({ finished: true, attempt_id: done.id });
+    return;
+  }
+
+  if (!quiz.time_limit_minutes) {
+    res.json({ finished: false, timed: false, remaining_seconds: null, answers: {} });
+    return;
+  }
+
+  const [counted] = await sql`SELECT COUNT(*)::int AS n FROM quiz_questions WHERE quiz_id = ${quiz.id}`;
+  if (!counted || counted.n === 0) throw httpError(409, 'This quiz has no questions yet');
+
+  // The first call sets the deadline; ON CONFLICT keeps it for every later one.
+  await sql`
+    INSERT INTO quiz_sessions (quiz_id, student_id, expires_at)
+    VALUES (${quiz.id}, ${studentId}, now() + (${quiz.time_limit_minutes}::int * interval '1 minute'))
+    ON CONFLICT (quiz_id, student_id) DO NOTHING
+  `;
+  const [session] = await sql`
+    SELECT started_at, expires_at, answers,
+           GREATEST(0, CEIL(EXTRACT(EPOCH FROM (expires_at - now()))))::int AS remaining_seconds
+    FROM quiz_sessions
+    WHERE quiz_id = ${quiz.id} AND student_id = ${studentId}
+  `;
+  res.json({
+    finished: false,
+    timed: true,
+    started_at: session.started_at,
+    expires_at: session.expires_at,
+    remaining_seconds: session.remaining_seconds,
+    answers: session.answers ?? {},
+  });
+}
+
+/**
+ * The answers typed so far, saved while the student works. If time runs out while they are away,
+ * this is what gets submitted for them. Refused once the time is over or the quiz is submitted.
+ */
+export async function saveQuizProgress(req: Request, res: Response): Promise<void> {
+  const user = currentUser(req);
+  const studentId = await studentIdOf(user);
+  const input = saveQuizProgressSchema.parse(req.body);
+  const quiz = await loadQuizForStudent(studentId, input.quiz_id);
+
+  const questions = await sql`SELECT id FROM quiz_questions WHERE quiz_id = ${quiz.id}`;
+  // Saved as typed (not trimmed): this is a working copy, the answers are cleaned when graded.
+  const answers = cleanAnswers(questions as Array<{ id: string }>, input.answers, false);
+
+  const [saved] = await sql`
+    UPDATE quiz_sessions
+    SET answers = ${JSON.stringify(answers)}::jsonb, updated_at = now()
+    WHERE quiz_id = ${quiz.id} AND student_id = ${studentId}
+      AND expires_at > now()
+      AND NOT EXISTS (
+        SELECT 1 FROM quiz_attempts a WHERE a.quiz_id = quiz_sessions.quiz_id AND a.student_id = quiz_sessions.student_id
+      )
+    RETURNING quiz_id
+  `;
+  if (!saved) throw httpError(409, 'This quiz is no longer open for answers.');
+  res.json({ saved: true });
+}
+
+/**
+ * A student submits their answers. The server grades them; the client never sends a score.
+ * For a timed quiz the server's clock decides: a submission that arrives after the deadline (plus a
+ * short grace period) is replaced by the answers saved while the student was working.
+ */
+export async function submitQuizAttempt(req: Request, res: Response): Promise<void> {
+  const user = currentUser(req);
+  const studentId = await studentIdOf(user);
+  const input = submitQuizAttemptSchema.parse(req.body);
+  const quiz = await loadQuizForStudent(studentId, input.quiz_id);
 
   const questions = (await sql`
-    SELECT id, type, correct_answer, points FROM quiz_questions WHERE quiz_id = ${input.quiz_id}
+    SELECT id, type, correct_answer, points FROM quiz_questions WHERE quiz_id = ${quiz.id}
   `) as GradableQuestion[];
   if (questions.length === 0) throw httpError(409, 'This quiz has no questions yet');
 
-  // Keep only answers to real questions of this quiz.
-  const known = new Set(questions.map((q) => q.id));
-  const answers: Record<string, string> = {};
-  for (const [questionId, answer] of Object.entries(input.answers)) {
-    if (known.has(questionId)) answers[questionId] = answer.trim();
+  let answers = cleanAnswers(questions, input.answers);
+  let autoSubmitted = false;
+
+  if (quiz.time_limit_minutes) {
+    const [session] = await sql`
+      SELECT answers,
+             now() >= expires_at AS ended,
+             now() > expires_at + (${SUBMIT_GRACE_SECONDS}::int * interval '1 second') AS past_grace
+      FROM quiz_sessions
+      WHERE quiz_id = ${quiz.id} AND student_id = ${studentId}
+    `;
+    // Without a recorded start there is no clock, so nothing to hold the student to: they must start first.
+    if (!session) {
+      throw httpError(409, 'This quiz has a time limit, so it has to be started first. Open it from the quiz page and try again.');
+    }
+    if (session.past_grace) {
+      // Too late to count what was just sent: the attempt is what the server saved in time.
+      answers = cleanAnswers(questions, (session.answers ?? {}) as Record<string, string>);
+      autoSubmitted = true;
+    } else {
+      autoSubmitted = session.ended === true || input.auto === true;
+    }
   }
 
-  const grade = gradeQuiz(questions, answers);
-
-  // One attempt per student: insert only if this student has none yet. A single statement, so it
-  // does not rely on a unique constraint (the table has none). The same statement records the
-  // result in grades, so an attempt and its grade always appear together.
+  // One attempt per student, enforced by the insert itself (the table has no unique constraint).
   let attempt;
   try {
-    [attempt] = await sql`
-      WITH ins AS (
-        INSERT INTO quiz_attempts (quiz_id, student_id, score, answers)
-        SELECT ${input.quiz_id}::uuid, ${studentId}::uuid, ${grade.score}::numeric, ${JSON.stringify(answers)}::jsonb
-        WHERE NOT EXISTS (
-          SELECT 1 FROM quiz_attempts
-          WHERE quiz_id = ${input.quiz_id}::uuid AND student_id = ${studentId}::uuid
-        )
-        RETURNING id, quiz_id, student_id, score, submitted_at
-      ),
-      g AS (
-        INSERT INTO grades (student_id, course_id, assessment_type, assessment_id, score, term)
-        SELECT ins.student_id, ${quiz.course_id}::uuid, 'quiz', ins.quiz_id, ins.score, ${schoolYearTerm()}::text
-        FROM ins
-        WHERE NOT EXISTS (
-          SELECT 1 FROM grades
-          WHERE student_id = ins.student_id AND assessment_type = 'quiz' AND assessment_id = ins.quiz_id
-        )
-        RETURNING id
-      )
-      SELECT id, quiz_id, student_id, score::float8 AS score, submitted_at FROM ins
-    `;
+    attempt = await recordAttempt({
+      quizId: quiz.id,
+      courseId: quiz.course_id,
+      studentId,
+      questions,
+      answers,
+      autoSubmitted,
+    });
   } catch (err) {
     rethrowDbError(err, {});
   }
 
   if (!attempt) throw httpError(409, 'You have already taken this quiz.');
-  res.status(201).json({
-    attempt: { ...attempt, earned_points: grade.earned_points, total_points: grade.total_points },
-  });
+  res.status(201).json({ attempt });
 }
 
 /**
@@ -96,7 +187,7 @@ export async function getQuizAttempt(req: Request, res: Response): Promise<void>
   const id = parseUuid(req.params.id, 'attempt id');
 
   const [attempt] = await sql`
-    SELECT a.id, a.quiz_id, a.student_id, a.score::float8 AS score, a.answers, a.submitted_at,
+    SELECT a.id, a.quiz_id, a.student_id, a.score::float8 AS score, a.answers, a.submitted_at, a.auto_submitted,
            q.title AS quiz_title, c.code AS course_code, c.name AS course_name,
            p.first_name, p.last_name, st.student_id AS student_number
     FROM quiz_attempts a
@@ -155,6 +246,8 @@ export async function getQuizAttempt(req: Request, res: Response): Promise<void>
       earned_points: earned,
       total_points: total,
       submitted_at: attempt.submitted_at,
+      // True when the time limit ended and the server submitted what the student had.
+      auto_submitted: attempt.auto_submitted === true,
       // Only managers need to know whose attempt it is.
       student_name:
         user.role === 'student'
@@ -165,7 +258,10 @@ export async function getQuizAttempt(req: Request, res: Response): Promise<void>
   });
 }
 
-/** Teacher view of one quiz: every active student, with their score or "not taken". */
+/**
+ * Teacher view of one quiz: every active student enrolled in the course, with their score or "not
+ * taken". Someone who took it and has since left the course still shows, so their result is never hidden.
+ */
 export async function listQuizAttempts(req: Request, res: Response): Promise<void> {
   const user = currentUser(req);
   if (user.role !== 'admin' && user.role !== 'teacher') {
@@ -175,20 +271,27 @@ export async function listQuizAttempts(req: Request, res: Response): Promise<voi
 
   const quiz = await assertCanManageQuiz(user, quizId);
 
+  // Students whose time ran out without submitting are closed first, so the list is complete.
+  await autoSubmitExpired({ quizId });
+
   const attempts = await sql`
     SELECT st.id AS student_id, st.student_id AS student_number, p.first_name, p.last_name,
-           att.id AS attempt_id, att.score, att.submitted_at
+           att.id AS attempt_id, att.score, att.submitted_at, att.auto_submitted
     FROM students st
     JOIN users u ON u.id = st.user_id
     JOIN profiles p ON p.user_id = u.id
     LEFT JOIN LATERAL (
-      SELECT a.id, a.score::float8 AS score, a.submitted_at
+      SELECT a.id, a.score::float8 AS score, a.submitted_at, a.auto_submitted
       FROM quiz_attempts a
       WHERE a.quiz_id = ${quizId} AND a.student_id = st.id
       ORDER BY a.submitted_at DESC
       LIMIT 1
     ) att ON TRUE
-    WHERE u.is_active = TRUE OR att.id IS NOT NULL
+    WHERE (
+            u.is_active = TRUE
+            AND EXISTS (SELECT 1 FROM enrollments e WHERE e.student_id = st.id AND e.course_id = ${quiz.course_id})
+          )
+       OR att.id IS NOT NULL
     ORDER BY p.last_name ASC, p.first_name ASC
   `;
 

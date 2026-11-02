@@ -5,7 +5,8 @@ import {
   signRefreshToken,
   verifyRefreshToken,
 } from '../utils/jwt.js';
-import { comparePassword } from '../utils/password.js';
+import { comparePassword, hashPassword } from '../utils/password.js';
+import { loginSchema } from '../utils/validation.js';
 import { isTokenRevoked } from '../utils/sessions.js';
 import type { AppError } from '../middleware/errorHandler.js';
 
@@ -17,15 +18,21 @@ const COOKIE_OPTIONS: Record<string, unknown> = {
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 
+// Checked against when the email is unknown, so a miss costs as much as a wrong password. Without
+// it the faster answer would tell an attacker which emails have an account (a timing side channel).
+const DUMMY_PASSWORD_HASH = hashPassword('this-is-not-a-real-password');
+
 export async function login(req: Request, res: Response): Promise<void> {
-  const { email, password } = req.body as { email: string; password: string };
+  // The validation middleware only checks the body; parsing here gives the trimmed, lower-cased email.
+  const { email, password } = loginSchema.parse(req.body);
 
   const [user] = await sql`
     SELECT id, email, password_hash, role, is_active
-    FROM users WHERE email = ${email}
+    FROM users WHERE lower(email) = lower(${email})
   `;
 
-  if (!user || !(await comparePassword(password, user.password_hash))) {
+  const passwordMatches = await comparePassword(password, user ? user.password_hash : await DUMMY_PASSWORD_HASH);
+  if (!user || !passwordMatches) {
     const err = new Error('Invalid email or password') as AppError;
     err.statusCode = 401;
     throw err;

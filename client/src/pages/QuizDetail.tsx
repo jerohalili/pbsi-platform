@@ -32,6 +32,8 @@ interface AttemptRow {
   attempt_id: string | null;
   score: number | null;
   submitted_at: string | null;
+  /** The time limit ended and the server submitted what the student had. */
+  auto_submitted?: boolean;
 }
 
 export default function QuizDetailPage() {
@@ -185,7 +187,7 @@ export default function QuizDetailPage() {
               <p className="text-sm">
                 You can take this quiz <strong>once</strong>.{' '}
                 {quiz.time_limit_minutes
-                  ? `You will have ${quiz.time_limit_minutes} minutes; it is submitted automatically when time runs out.`
+                  ? `You will have ${quiz.time_limit_minutes} minutes. The timer starts when you press Start and keeps running even if you close the page. Your answers are saved as you go and submitted automatically when time runs out.`
                   : 'There is no time limit.'}
               </p>
               <Button asChild>
@@ -307,7 +309,18 @@ export default function QuizDetailPage() {
                               <div className="text-xs text-muted-foreground">{a.student_number}</div>
                             </TableCell>
                             <TableCell className="text-sm">
-                              {a.attempt_id ? `${a.score}%` : <Badge variant="outline">Not taken</Badge>}
+                              {a.attempt_id ? (
+                                <span className="inline-flex items-center gap-2 flex-wrap">
+                                  {a.score}%
+                                  {a.auto_submitted && (
+                                    <Badge variant="warning" className="whitespace-nowrap" title="Submitted automatically when the time limit ended">
+                                      Auto-submitted
+                                    </Badge>
+                                  )}
+                                </span>
+                              ) : (
+                                <Badge variant="outline">Not taken</Badge>
+                              )}
                             </TableCell>
                             <TableCell className="text-sm">{a.submitted_at ? formatDateTime(a.submitted_at) : '—'}</TableCell>
                             <TableCell className="text-right">
