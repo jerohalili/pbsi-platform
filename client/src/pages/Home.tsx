@@ -70,7 +70,7 @@ export default function Home() {
           <section className="relative text-center pt-24 pb-16 md:pt-32 md:pb-24">
             <div className="inline-flex items-center gap-2 bg-primary/10 px-6 py-2.5 rounded-2xl border border-primary/10 text-primary font-bold text-xs uppercase tracking-widest mb-10 inline-block">
               <GraduationCap className="w-4 h-4" />
-              <span>PBSI School Management</span>
+              <span>PBSI School Portal</span>
             </div>
             <h1 className="text-5xl md:text-7xl lg:text-8xl font-black text-site-text leading-[0.95] tracking-tighter mb-8">
               Presbyterian Bible <br />
