@@ -91,6 +91,16 @@ export default function Home() {
               >
                 Sign in
               </Button>
+
+              <Button
+                asChild
+                href="https://pbsi1992.github.io"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full sm:w-auto !h-auto !bg-site-card/60 backdrop-blur-sm !text-site-text !border-2 !border-site-border !px-14 !py-6 rounded-2xl font-bold text-xl transition-all duration-300 hover:-translate-y-1 hover:bg-site-card hover:border-primary/20 hover:shadow-xl hover:shadow-primary/10 active:scale-95"
+              >
+                Visit PBSI Website
+              </Button>
             </div>
           </section>
 
