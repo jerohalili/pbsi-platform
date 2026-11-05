@@ -25,7 +25,9 @@ import {
 } from '../utils/upload.js';
 import type { AuthUser } from '../types/index.js';
 import { recordAudit, diffValues } from '../utils/audit.js';
-import { notifyCourseStudents, formatManila } from '../utils/notify.js';
+import { notifyCourseStudents, formatManila, formatRoom } from '../utils/notify.js';
+import { deleteScoresOf } from '../utils/manualScoring.js';
+import { toPercent } from '../utils/gradeTerm.js';
 
 function currentUser(req: Request): AuthUser {
   if (!req.user) throw httpError(401, 'Not authenticated');
@@ -50,7 +52,7 @@ async function queryAssignments(user: AuthUser, filters: AssignmentFilters) {
   const ownStudentId = isStudent ? await getOwnStudentId(user.id) : null;
 
   const rows = await sql`
-    SELECT a.id, a.module_id, a.title, a.instructions, a.due_date, a.is_published,
+    SELECT a.id, a.module_id, a.title, a.instructions, a.due_date, a.is_published, a.delivery, a.room,
            a.max_score::float8 AS max_score, a.attachment_url, a.attachment_name,
            (a.attachment_public_id IS NOT NULL) AS has_attachment_file, a.created_at,
            m.title AS module_title,
@@ -58,6 +60,9 @@ async function queryAssignments(user: AuthUser, filters: AssignmentFilters) {
            (te.user_id = ${user.id}) AS is_mine,
            (SELECT COUNT(*) FROM submissions x WHERE x.assignment_id = a.id)::int AS submitted_count,
            (SELECT COUNT(*) FROM submissions x WHERE x.assignment_id = a.id AND x.grade IS NOT NULL)::int AS graded_count,
+           (SELECT COUNT(*) FROM manual_scores x WHERE x.item_type = 'assignment' AND x.item_id = a.id)::int AS scored_count,
+           (SELECT COUNT(*) FROM enrollments en WHERE en.course_id = c.id)::int AS enrolled_count,
+           ms.score::float8 AS manual_score, ms.feedback AS manual_feedback, ms.graded_at AS manual_graded_at,
            sub.id AS submission_id, sub.file_url AS submission_url,
            sub.file_name AS submission_file_name,
            (sub.file_public_id IS NOT NULL) AS submission_is_file,
@@ -74,6 +79,8 @@ async function queryAssignments(user: AuthUser, filters: AssignmentFilters) {
       ORDER BY s.submitted_at DESC
       LIMIT 1
     ) sub ON TRUE
+    LEFT JOIN manual_scores ms
+           ON ms.item_type = 'assignment' AND ms.item_id = a.id AND ms.student_id = ${ownStudentId}::uuid
     WHERE (${filters.id ?? ''}::text = '' OR a.id = NULLIF(${filters.id ?? ''}::text, '')::uuid)
       AND (${filters.courseId ?? ''}::text = '' OR c.id = NULLIF(${filters.courseId ?? ''}::text, '')::uuid)
       AND (${filters.moduleId ?? ''}::text = '' OR a.module_id = NULLIF(${filters.moduleId ?? ''}::text, '')::uuid)
@@ -92,6 +99,20 @@ async function queryAssignments(user: AuthUser, filters: AssignmentFilters) {
     }
     // Students never see how the rest of the class is doing.
     let status: string;
+    if (row.delivery === 'in_person') {
+      // Checked face to face: nothing to hand in, only a score the teacher types in later.
+      const scored = row.manual_score !== null;
+      status = scored ? 'scored' : new Date(row.due_date as string).getTime() < Date.now() ? 'awaiting_score' : 'upcoming';
+      return {
+        ...base,
+        status,
+        manual_percent: scored ? toPercent(row.manual_score as number, row.max_score as number) : null,
+        submitted_count: null,
+        graded_count: null,
+        scored_count: null,
+        enrolled_count: null,
+      };
+    }
     if (row.submission_id === null) {
       status = new Date(row.due_date as string).getTime() < Date.now() ? 'overdue' : 'not_submitted';
     } else if (row.grade !== null) {
@@ -99,7 +120,7 @@ async function queryAssignments(user: AuthUser, filters: AssignmentFilters) {
     } else {
       status = 'submitted';
     }
-    return { ...base, status, submitted_count: null, graded_count: null };
+    return { ...base, status, submitted_count: null, graded_count: null, scored_count: null, enrolled_count: null };
   });
 }
 
@@ -133,9 +154,10 @@ export async function createAssignment(req: Request, res: Response): Promise<voi
 
   // New assignments start as drafts; students hear about one only when it is published.
   const [created] = await sql`
-    INSERT INTO assignments (module_id, title, instructions, due_date, max_score, attachment_url, is_published)
+    INSERT INTO assignments (module_id, title, instructions, due_date, max_score, attachment_url, is_published, delivery, room)
     VALUES (${input.module_id}, ${input.title}, ${input.instructions || null},
-            ${input.due_date}, ${input.max_score}, ${input.attachment_url || null}, FALSE)
+            ${input.due_date}, ${input.max_score}, ${input.attachment_url || null}, FALSE,
+            ${input.delivery}, ${input.room || null})
     RETURNING id
   `;
 
@@ -144,6 +166,7 @@ export async function createAssignment(req: Request, res: Response): Promise<voi
     due_date: new Date(input.due_date).toISOString(),
     max_score: input.max_score,
     course_id: courseId,
+    delivery: input.delivery,
   });
 
   const [assignment] = await queryAssignments(user, { id: created.id as string });
@@ -172,6 +195,27 @@ export async function updateAssignment(req: Request, res: Response): Promise<voi
     }
   }
 
+  // Same for scores the teacher typed in for an in-person assignment.
+  if (input.max_score !== undefined && before.delivery === 'in_person') {
+    const [over] = await sql`
+      SELECT COUNT(*)::int AS n FROM manual_scores
+      WHERE item_type = 'assignment' AND item_id = ${id} AND score > ${input.max_score}::numeric
+    `;
+    if (over && over.n > 0) {
+      throw httpError(409, 'Some students already have a score higher than that maximum. Adjust those scores first.');
+    }
+  }
+
+  // Taking an in-person assignment back to draft would hide scores students have already been given.
+  if (input.is_published === false && before.is_published && before.delivery === 'in_person') {
+    const [scored] = await sql`
+      SELECT COUNT(*)::int AS n FROM manual_scores WHERE item_type = 'assignment' AND item_id = ${id}
+    `;
+    if (scored && scored.n > 0) {
+      throw httpError(409, 'Scores have already been recorded, so this assignment can no longer be unpublished.');
+    }
+  }
+
   // Taking an assignment back to draft would hide work students have already handed in.
   if (input.is_published === false && before.is_published) {
     const [handedIn] = await sql`SELECT COUNT(*)::int AS n FROM submissions WHERE assignment_id = ${id}`;
@@ -183,6 +227,7 @@ export async function updateAssignment(req: Request, res: Response): Promise<voi
   // Optional text fields: undefined = leave unchanged, '' = clear.
   const instructionsProvided = input.instructions !== undefined;
   const attachmentProvided = input.attachment_url !== undefined;
+  const roomProvided = input.room !== undefined;
 
   await sql`
     UPDATE assignments
@@ -191,6 +236,7 @@ export async function updateAssignment(req: Request, res: Response): Promise<voi
         due_date = COALESCE(${input.due_date ?? null}::timestamptz, due_date),
         max_score = COALESCE(${input.max_score ?? null}::numeric, max_score),
         is_published = COALESCE(${input.is_published ?? null}::boolean, is_published),
+        room = CASE WHEN ${roomProvided}::boolean THEN NULLIF(${input.room ?? ''}::text, '') ELSE room END,
         attachment_url = CASE WHEN ${attachmentProvided}::boolean THEN ${input.attachment_url || null} ELSE attachment_url END
     WHERE id = ${id}
   `;
@@ -215,7 +261,7 @@ export async function updateAssignment(req: Request, res: Response): Promise<voi
   if (!before.is_published && input.is_published === true) {
     try {
       const [fresh] = await sql`
-        SELECT a.title, a.due_date, c.code
+        SELECT a.title, a.due_date, a.delivery, a.room, c.code
         FROM assignments a
         JOIN modules m ON m.id = a.module_id
         JOIN courses c ON c.id = m.course_id
@@ -225,7 +271,10 @@ export async function updateAssignment(req: Request, res: Response): Promise<voi
         await notifyCourseStudents(before.course_id, {
           type: 'assignment',
           title: 'New assignment',
-          message: `${fresh.title}${fresh.code ? ` (${fresh.code})` : ''} is due ${formatManila(fresh.due_date as string)}`,
+          message:
+            fresh.delivery === 'in_person'
+              ? `${fresh.title}${fresh.code ? ` (${fresh.code})` : ''} · in person · ${formatManila(fresh.due_date as string)}${fresh.room ? ` · ${formatRoom(fresh.room as string)}` : ''}`
+              : `${fresh.title}${fresh.code ? ` (${fresh.code})` : ''} is due ${formatManila(fresh.due_date as string)}`,
           link: `/assignments/${id}`,
         });
       }
@@ -249,8 +298,10 @@ export async function deleteAssignment(req: Request, res: Response): Promise<voi
     SELECT file_public_id FROM submissions WHERE assignment_id = ${id} AND file_public_id IS NOT NULL
   `;
 
-  // Cascade delete submissions before removing the assignment.
+  // Cascade delete submissions before removing the assignment. The scores typed in for an in-person
+  // assignment go with it (online work keeps its grades, as it always has).
   await sql`DELETE FROM submissions WHERE assignment_id = ${id}`;
+  if (before.delivery === 'in_person') await deleteScoresOf('assignment', [id]);
   try {
     const [assignment] = await sql`DELETE FROM assignments WHERE id = ${id} RETURNING id`;
     if (!assignment) throw httpError(404, 'Assignment not found');

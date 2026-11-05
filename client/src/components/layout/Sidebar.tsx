@@ -8,7 +8,6 @@ import {
   LayoutDashboard,
   Users,
   UserCog,
-  FileText,
   Calendar,
   ClipboardList,
   CalendarDays,
@@ -52,13 +51,20 @@ const navItems: Array<{
   href: string;
   icon: React.ReactNode;
   roles: ('admin' | 'teacher' | 'student')[];
+  also?: string[];
 }> = [
   { label: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard size={18} />, roles: ['admin', 'teacher', 'student'] },
   { label: 'Users', href: '/users', icon: <UserCog size={18} />, roles: ['admin'] },
   { label: 'Students', href: '/students', icon: <Users size={18} />, roles: ['admin', 'teacher'] },
   { label: 'Courses', href: '/courses', icon: <BookOpen size={18} />, roles: ['admin', 'teacher', 'student'] },
-  { label: 'Assignments', href: '/assignments', icon: <FileText size={18} />, roles: ['admin', 'teacher', 'student'] },
-  { label: 'Quizzes', href: '/quizzes', icon: <ClipboardList size={18} />, roles: ['admin', 'teacher', 'student'] },
+  {
+    label: 'Coursework',
+    href: '/coursework',
+    icon: <ClipboardList size={18} />,
+    roles: ['admin', 'teacher', 'student'],
+    // Assignments, quizzes and exams are pages of the same section, so it stays highlighted on them.
+    also: ['/assignments', '/quizzes', '/exams', '/quiz-results'],
+  },
   { label: 'Attendance', href: '/attendance', icon: <Calendar size={18} />, roles: ['admin', 'teacher', 'student'] },
   { label: 'Timetable', href: '/timetable', icon: <CalendarDays size={18} />, roles: ['admin', 'teacher', 'student'] },
   { label: 'Grades', href: '/grades', icon: <Award size={18} />, roles: ['admin', 'teacher', 'student'] },
@@ -67,6 +73,13 @@ const navItems: Array<{
   { label: 'Settings', href: '/settings', icon: <Settings size={18} />, roles: ['admin', 'teacher', 'student'] },
   { label: 'Audit Logs', href: '/audit-logs', icon: <ShieldAlert size={18} />, roles: ['admin'] },
 ];
+
+/** Active on its own page, and on the pages that belong to it (an item's detail page). */
+function isActiveItem(item: { href: string; also?: string[] }, pathname: string): boolean {
+  if (pathname === item.href) return true;
+  return (item.also ?? []).some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+
 
 export function Sidebar() {
   const { user, logout } = useAuth();
@@ -113,7 +126,7 @@ export function Sidebar() {
 
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
         {items.map((item) => {
-          const isActive = location.pathname === item.href;
+          const isActive = isActiveItem(item, location.pathname);
           const badge = item.href === '/notifications' ? unread : 0;
           return (
             <button
@@ -247,7 +260,7 @@ export function MobileNav() {
 
         <nav className="flex-1 space-y-1 overflow-y-auto p-3">
           {items.map((item) => {
-            const isActive = location.pathname === item.href;
+            const isActive = isActiveItem(item, location.pathname);
             const badge = item.href === '/notifications' ? unread : 0;
             return (
               <button

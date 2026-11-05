@@ -19,6 +19,9 @@ import { newTimeOrderedUuid } from '../utils/ids.js';
 import { recordAudit, diffValues } from '../utils/audit.js';
 import { notifyCourseStudents } from '../utils/notify.js';
 import { autoSubmitExpired } from '../utils/quizSessions.js';
+import { deleteScoresOf } from '../utils/manualScoring.js';
+import { formatRoom, formatManila } from '../utils/notify.js';
+import { toPercent } from '../utils/gradeTerm.js';
 import {
   deleteFromCloudinary,
   deleteManyFromCloudinary,
@@ -53,12 +56,20 @@ async function queryQuizzes(user: AuthUser, filters: QuizFilters) {
 
   const rows = await sql`
     SELECT q.id, q.course_id, q.title, q.time_limit_minutes, q.is_published, q.created_at,
+           q.delivery, q.scheduled_at, q.room, q.details, q.max_score::float8 AS max_score,
            c.code AS course_code, c.name AS course_name,
            (te.user_id = ${user.id}) AS is_mine,
            (SELECT COUNT(*) FROM quiz_questions x WHERE x.quiz_id = q.id)::int AS question_count,
            (SELECT COALESCE(SUM(x.points), 0) FROM quiz_questions x WHERE x.quiz_id = q.id)::int AS total_points,
            (SELECT COUNT(*) FROM quiz_attempts a WHERE a.quiz_id = q.id)::int AS attempt_count,
-           (SELECT ROUND(AVG(a.score), 2)::float8 FROM quiz_attempts a WHERE a.quiz_id = q.id) AS average_score,
+           (SELECT COUNT(*) FROM manual_scores x WHERE x.item_type = 'quiz' AND x.item_id = q.id)::int AS scored_count,
+           (SELECT COUNT(*) FROM enrollments en WHERE en.course_id = q.course_id)::int AS enrolled_count,
+           CASE WHEN q.delivery = 'in_person'
+                THEN (SELECT ROUND(AVG(x.score / q.max_score * 100), 2)::float8 FROM manual_scores x
+                      WHERE x.item_type = 'quiz' AND x.item_id = q.id)
+                ELSE (SELECT ROUND(AVG(a.score), 2)::float8 FROM quiz_attempts a WHERE a.quiz_id = q.id)
+           END AS average_score,
+           ms.score::float8 AS manual_score, ms.feedback AS manual_feedback, ms.graded_at AS manual_graded_at,
            att.id AS attempt_id, att.score AS my_score, att.submitted_at AS my_submitted_at
     FROM quizzes q
     JOIN courses c ON c.id = q.course_id
@@ -70,6 +81,8 @@ async function queryQuizzes(user: AuthUser, filters: QuizFilters) {
       ORDER BY a.submitted_at DESC
       LIMIT 1
     ) att ON TRUE
+    LEFT JOIN manual_scores ms
+           ON ms.item_type = 'quiz' AND ms.item_id = q.id AND ms.student_id = ${ownStudentId}::uuid
     WHERE (${filters.id ?? ''}::text = '' OR q.id = NULLIF(${filters.id ?? ''}::text, '')::uuid)
       AND (${filters.courseId ?? ''}::text = '' OR q.course_id = NULLIF(${filters.courseId ?? ''}::text, '')::uuid)
       AND (q.is_published = TRUE OR te.user_id = ${user.id} OR ${user.role === 'admin'}::boolean)
@@ -83,15 +96,33 @@ async function queryQuizzes(user: AuthUser, filters: QuizFilters) {
     const canManage = user.role === 'admin' || (user.role === 'teacher' && row.is_mine === true);
     const base = { ...row, can_manage: canManage };
     if (isStudent) {
+      if (row.delivery === 'in_person') {
+        // Taken face to face: no attempt to make, only a score the teacher types in later.
+        const scored = row.manual_score !== null;
+        const when = row.scheduled_at ? new Date(row.scheduled_at as string).getTime() : 0;
+        return {
+          ...base,
+          status: scored ? 'scored' : when < Date.now() ? 'awaiting_score' : 'upcoming',
+          manual_percent: scored ? toPercent(row.manual_score as number, row.max_score as number) : null,
+          attempt_count: null,
+          average_score: null,
+          scored_count: null,
+          enrolled_count: null,
+        };
+      }
       return {
         ...base,
         status: row.attempt_id ? 'completed' : 'not_taken',
         attempt_count: null,
         average_score: null,
+        scored_count: null,
+        enrolled_count: null,
       };
     }
     // Teachers who don't run the course see the quiz exists, not how the class did.
-    return canManage ? { ...base, status: null } : { ...base, status: null, attempt_count: null, average_score: null };
+    return canManage
+      ? { ...base, status: null }
+      : { ...base, status: null, attempt_count: null, average_score: null, scored_count: null, enrolled_count: null };
   });
 }
 
@@ -153,14 +184,17 @@ export async function createQuiz(req: Request, res: Response): Promise<void> {
 
   // New quizzes start as drafts; publishing needs at least one question.
   const [created] = await sql`
-    INSERT INTO quizzes (course_id, title, time_limit_minutes, is_published)
-    VALUES (${input.course_id}, ${input.title}, ${input.time_limit_minutes ?? null}, FALSE)
+    INSERT INTO quizzes (course_id, title, time_limit_minutes, is_published, delivery, scheduled_at, room, details, max_score)
+    VALUES (${input.course_id}, ${input.title}, ${input.time_limit_minutes ?? null}, FALSE,
+            ${input.delivery}, ${input.scheduled_at ?? null}, ${input.room || null}, ${input.details || null},
+            ${input.max_score})
     RETURNING id
   `;
   await recordAudit(req, 'quiz.create', 'quiz', created.id as string, null, {
     title: input.title,
     course_id: input.course_id,
     time_limit_minutes: input.time_limit_minutes ?? null,
+    delivery: input.delivery,
   });
   const [quiz] = await queryQuizzes(user, { id: created.id as string });
   res.status(201).json({ quiz });
@@ -172,11 +206,38 @@ export async function updateQuiz(req: Request, res: Response): Promise<void> {
   const input = updateQuizSchema.parse(req.body);
 
   const before = await assertCanManageQuiz(user, id);
+  const inPerson = before.delivery === 'in_person';
 
-  if (input.is_published === true) {
+  // The date, room and maximum score belong to in-person quizzes only.
+  if (!inPerson && (input.scheduled_at !== undefined || input.room !== undefined || input.max_score !== undefined)) {
+    throw httpError(400, 'Only in-person quizzes have a date, a room and a maximum score.');
+  }
+
+  // An in-person quiz has no online questions, so there is nothing to wait for before publishing.
+  if (input.is_published === true && !inPerson) {
     const [row] = await sql`SELECT COUNT(*)::int AS n FROM quiz_questions WHERE quiz_id = ${id}`;
     if (!row || row.n < 1) {
       throw httpError(409, 'Add at least one question before publishing this quiz.');
+    }
+  }
+
+  if (inPerson) {
+    // Taking it back to draft would hide scores students have already been given.
+    if (input.is_published === false && before.is_published) {
+      const [scored] = await sql`SELECT COUNT(*)::int AS n FROM manual_scores WHERE item_type = 'quiz' AND item_id = ${id}`;
+      if (scored && scored.n > 0) {
+        throw httpError(409, 'Scores have already been recorded, so this quiz can no longer be unpublished.');
+      }
+    }
+    // The maximum cannot drop below a score that was already typed in.
+    if (input.max_score !== undefined) {
+      const [over] = await sql`
+        SELECT COUNT(*)::int AS n FROM manual_scores
+        WHERE item_type = 'quiz' AND item_id = ${id} AND score > ${input.max_score}::numeric
+      `;
+      if (over && over.n > 0) {
+        throw httpError(409, 'Some students already have a score higher than that maximum. Adjust those scores first.');
+      }
     }
   }
 
@@ -185,7 +246,11 @@ export async function updateQuiz(req: Request, res: Response): Promise<void> {
     UPDATE quizzes
     SET title = COALESCE(${input.title ?? null}, title),
         time_limit_minutes = CASE WHEN ${timeProvided}::boolean THEN ${input.time_limit_minutes ?? null}::int ELSE time_limit_minutes END,
-        is_published = COALESCE(${input.is_published ?? null}::boolean, is_published)
+        is_published = COALESCE(${input.is_published ?? null}::boolean, is_published),
+        details = CASE WHEN ${input.details !== undefined}::boolean THEN NULLIF(${input.details ?? ''}::text, '') ELSE details END,
+        scheduled_at = COALESCE(${input.scheduled_at ?? null}::timestamptz, scheduled_at),
+        room = CASE WHEN ${input.room !== undefined}::boolean THEN NULLIF(${input.room ?? ''}::text, '') ELSE room END,
+        max_score = COALESCE(${input.max_score ?? null}::numeric, max_score)
     WHERE id = ${id}
   `;
 
@@ -203,10 +268,14 @@ export async function updateQuiz(req: Request, res: Response): Promise<void> {
   if (before.is_published === false && input.is_published === true) {
     try {
       const [course] = await sql`SELECT code FROM courses WHERE id = ${before.course_id}`;
+      const [fresh] = await sql`SELECT title, scheduled_at, room FROM quizzes WHERE id = ${id}`;
+      const label = `${fresh?.title ?? before.title}${course?.code ? ` (${course.code})` : ''}`;
       await notifyCourseStudents(before.course_id, {
         type: 'quiz',
-        title: 'Quiz available',
-        message: `${input.title ?? before.title}${course?.code ? ` (${course.code})` : ''} is now open`,
+        title: inPerson ? 'Quiz announced' : 'Quiz available',
+        message: inPerson
+          ? `${label} · in person · ${formatManila(fresh?.scheduled_at as string)}${fresh?.room ? ` · ${formatRoom(fresh.room as string)}` : ''}`
+          : `${label} is now open`,
         link: `/quizzes/${id}`,
       });
     } catch (err) {
@@ -230,6 +299,8 @@ export async function deleteQuiz(req: Request, res: Response): Promise<void> {
   // Cascade delete attempts before removing the quiz (questions go with ON DELETE CASCADE).
   await sql`DELETE FROM quiz_attempts WHERE quiz_id = ${id}`;
   await sql`DELETE FROM quiz_sessions WHERE quiz_id = ${id}`;
+  // The scores typed in for an in-person quiz go with it (online quizzes keep their grades, as before).
+  if (before.delivery === 'in_person') await deleteScoresOf('quiz', [id]);
   const [quiz] = await sql`DELETE FROM quizzes WHERE id = ${id} RETURNING id`;
   if (!quiz) throw httpError(404, 'Quiz not found');
   await deleteManyFromCloudinary(pictures.map((row) => row.image_public_id as string), 'image');

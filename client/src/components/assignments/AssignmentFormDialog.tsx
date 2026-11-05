@@ -18,7 +18,8 @@ import { FilePicker } from '@/components/common/FilePicker.tsx';
 import { useToast } from '@/components/ui/toast.tsx';
 import { getErrorMessage } from '@/lib/errors.ts';
 import { localInputToIso, toLocalInputValue } from '@/lib/utils.ts';
-import type { AssignmentItem } from './types.ts';
+import { DeliveryToggle } from '@/components/coursework/DeliveryToggle.tsx';
+import type { AssignmentItem, Delivery } from './types.ts';
 
 interface AssignmentFormDialogProps {
   open: boolean;
@@ -46,6 +47,8 @@ export function AssignmentFormDialog({
   const [dueDate, setDueDate] = useState('');
   const [maxScore, setMaxScore] = useState('100');
   const [attachmentUrl, setAttachmentUrl] = useState('');
+  const [delivery, setDelivery] = useState<Delivery>('online');
+  const [room, setRoom] = useState('');
   const [selectedModuleId, setSelectedModuleId] = useState<string | undefined>(moduleId);
   const [file, setFile] = useState<File | null>(null);
   const [removeFile, setRemoveFile] = useState(false);
@@ -62,7 +65,10 @@ export function AssignmentFormDialog({
     setDueDate(editing ? toLocalInputValue(assignment.due_date) : '');
     setMaxScore(editing ? String(assignment.max_score) : '100');
     setAttachmentUrl(editing ? (assignment.attachment_url ?? '') : '');
-    setSelectedModuleId(editing ? undefined : moduleId);
+    setDelivery(editing ? assignment.delivery : 'online');
+    setRoom(editing ? (assignment.room ?? '') : '');
+    // With only one module there is nothing to choose.
+    setSelectedModuleId(editing ? undefined : (moduleId ?? (modules?.length === 1 ? modules[0].id : undefined)));
     setFile(null);
     setRemoveFile(false);
     setProgress(0);
@@ -88,11 +94,13 @@ export function AssignmentFormDialog({
       due_date: localInputToIso(dueDate),
       max_score: Number(maxScore),
       attachment_url: attachmentUrl.trim(),
+      // Blank clears the room when editing.
+      ...(delivery === 'in_person' ? { room: room.trim() } : {}),
     };
     try {
       const { data } =
         mode === 'create' || !assignment
-          ? await api.post<{ assignment: { id: string } }>('/assignments', { ...payload, module_id: selectedModuleId })
+          ? await api.post<{ assignment: { id: string } }>('/assignments', { ...payload, delivery, module_id: selectedModuleId })
           : await api.patch<{ assignment: { id: string } }>(`/assignments/${assignment.id}`, payload);
       // The assignment is saved first; its material file is attached to the saved assignment.
       try {
@@ -127,7 +135,10 @@ export function AssignmentFormDialog({
         <DialogHeader>
           <DialogTitle>{mode === 'create' ? 'New assignment' : 'Edit assignment'}</DialogTitle>
           <DialogDescription>
-            Students hand in a file or a link to their work. You can attach one material file and/or a link.
+            {delivery === 'in_person'
+              ? 'Announced here and checked face to face. Nothing is handed in online; you enter each score afterwards.'
+              : 'Students hand in a file or a link to their work.'}{' '}
+            You can attach one material file and/or a link.
             {mode === 'create' && ' New assignments start as drafts: students can’t see them until you publish.'}
           </DialogDescription>
         </DialogHeader>
@@ -154,6 +165,17 @@ export function AssignmentFormDialog({
             </div>
           )}
 
+          {mode === 'create' && (
+            <DeliveryToggle
+              value={delivery}
+              onChange={setDelivery}
+              hints={{
+                online: 'Students hand in a file or a link, and you grade each submission.',
+                in_person: 'Only announced here (date, time, room). You check the work face to face and enter the scores.',
+              }}
+            />
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="af-title">Title</Label>
             <Input id="af-title" required value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -164,7 +186,7 @@ export function AssignmentFormDialog({
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="af-due">Due date</Label>
+              <Label htmlFor="af-due">{delivery === 'in_person' ? 'Date and time' : 'Due date'}</Label>
               <Input id="af-due" type="datetime-local" required value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
             </div>
             <div className="space-y-2">
@@ -172,6 +194,12 @@ export function AssignmentFormDialog({
               <Input id="af-max" type="number" min={1} max={1000} step="any" required value={maxScore} onChange={(e) => setMaxScore(e.target.value)} />
             </div>
           </div>
+          {delivery === 'in_person' && (
+            <div className="space-y-2">
+              <Label htmlFor="af-room">Room (optional)</Label>
+              <Input id="af-room" maxLength={100} value={room} onChange={(e) => setRoom(e.target.value)} />
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="af-attach">Material link (optional)</Label>
             <Input id="af-attach" type="url" placeholder="https://…" value={attachmentUrl} onChange={(e) => setAttachmentUrl(e.target.value)} />

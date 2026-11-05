@@ -29,16 +29,19 @@ function dispatch() {
   listeners.forEach((listener) => listener(memoryState));
 }
 
+// The state is replaced, never changed in place: React only re-renders when it is handed a new
+// object, so mutating the old one (as this used to) meant no toast was ever drawn.
 function addToToast(toast: Omit<Toast, 'id'>) {
   const id = genId();
   const newToast: Toast = { id, ...toast };
-  memoryState.toasts = [...memoryState.toasts, newToast].slice(0, TOAST_LIMIT);
+  // Keep the newest few; the oldest make room.
+  memoryState = { toasts: [...memoryState.toasts, newToast].slice(-TOAST_LIMIT) };
   dispatch();
   return id;
 }
 
 function dismiss(toastId: string) {
-  memoryState.toasts = memoryState.toasts.filter((t) => t.id !== toastId);
+  memoryState = { toasts: memoryState.toasts.filter((t) => t.id !== toastId) };
   dispatch();
 }
 
@@ -54,7 +57,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return createPortal(
-    <div className="fixed top-0 right-0 z-[100] flex flex-col gap-2 p-4 pointer-events-none">
+    <div className="fixed bottom-0 right-0 z-[100] flex flex-col gap-2 p-4 pointer-events-none">
       {state.toasts.map((toast) => (
         <ToastContent key={toast.id} toast={toast} onDismiss={() => dismiss(toast.id)} />
       ))}
@@ -65,21 +68,19 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 }
 
 function ToastContent({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }) {
-  const [open, setOpen] = React.useState(true);
   const variants: Record<string, string> = {
     default: 'bg-background border text-foreground',
     destructive: 'border-destructive bg-destructive text-destructive-foreground',
     success: 'border-green-500 bg-green-500/10 text-green-700',
   };
 
+  // Removed from the list when it has been shown long enough (it used to only be hidden, so the
+  // list filled up with expired toasts).
   React.useEffect(() => {
-    const timer = setTimeout(() => {
-      setOpen(false);
-    }, TOAST_REMOVE_DELAY);
+    const timer = setTimeout(onDismiss, TOAST_REMOVE_DELAY);
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  if (!open) return null;
 
   const variantClass = variants[toast.variant ?? 'default'] ?? variants.default;
 

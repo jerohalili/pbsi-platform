@@ -32,6 +32,36 @@ export function schemaProblems(rows: ColumnRow[]): string[] {
   return problems;
 }
 
+const COURSEWORK_SCRIPT = 'server/sql/coursework-exams.sql';
+
+/** Stops the server at startup, with instructions, when exams / in-person scoring are not set up yet. */
+export async function assertCourseworkSchema(): Promise<void> {
+  const [row] = await sql`
+    SELECT to_regclass('exams') IS NOT NULL AS has_exams,
+           to_regclass('manual_scores') IS NOT NULL AS has_scores,
+           EXISTS (
+             SELECT 1 FROM information_schema.columns
+             WHERE table_schema = current_schema() AND table_name = 'assignments' AND column_name = 'delivery'
+           ) AS has_assignment_delivery,
+           EXISTS (
+             SELECT 1 FROM information_schema.columns
+             WHERE table_schema = current_schema() AND table_name = 'quizzes' AND column_name = 'delivery'
+           ) AS has_quiz_delivery
+  `;
+  const missing = [
+    row?.has_exams ? null : 'table exams',
+    row?.has_scores ? null : 'table manual_scores',
+    row?.has_assignment_delivery ? null : 'column assignments.delivery',
+    row?.has_quiz_delivery ? null : 'column quizzes.delivery',
+  ].filter(Boolean);
+  if (missing.length > 0) {
+    throw new Error(
+      `The database is not ready for exams and in-person scoring (missing ${missing.join(', ')}). ` +
+        `Run ${COURSEWORK_SCRIPT} in the Neon SQL editor (safe to run more than once), then restart the server.`,
+    );
+  }
+}
+
 const TIMER_SCRIPT = 'server/sql/quiz-timer.sql';
 
 /** Stops the server at startup, with instructions, when the quiz timer table and column are missing. */

@@ -6,7 +6,7 @@ import useAuth from '@/hooks/useAuth.ts';
 import { useGet } from '@/hooks/useApi.ts';
 import api from '@/lib/api.ts';
 import { getErrorMessage } from '@/lib/errors.ts';
-import { formatDateTime } from '@/lib/utils.ts';
+import { formatDateTime, formatRoom } from '@/lib/utils.ts';
 import { FILE_RULES, checkFile, downloadPrivateFile, sendFile } from '@/lib/upload.ts';
 import { FilePicker } from '@/components/common/FilePicker.tsx';
 import { useToast } from '@/components/ui/toast.tsx';
@@ -22,6 +22,8 @@ import { AssignmentFormDialog } from '@/components/assignments/AssignmentFormDia
 import { GradeDialog, GradeTarget } from '@/components/assignments/GradeDialog.tsx';
 import { isWebUrl, type AssignmentItem, type AssignmentStatus } from '@/components/assignments/types.ts';
 import { ConfirmDialog } from '@/components/users/ConfirmDialog.tsx';
+import { InPersonBadge, MyScoreCard } from '@/components/coursework/shared.tsx';
+import { ScoreSheet } from '@/components/coursework/ScoreSheet.tsx';
 
 interface SubmissionRow {
   student_id: string;
@@ -74,11 +76,13 @@ export default function AssignmentDetailPage() {
   );
   const assignment = data?.assignment;
   const canManage = !isStudent && !!assignment?.can_manage;
+  // Announced only: nothing is handed in online, the teacher types in the scores.
+  const inPerson = assignment?.delivery === 'in_person';
 
   const { data: subData, isLoading: subsLoading } = useGet<{ submissions: SubmissionRow[] }>(
     ['submissions', id ?? ''],
     `/submissions?assignment_id=${id}`,
-    { enabled: !!id && canManage },
+    { enabled: !!id && canManage && !inPerson },
   );
   const rows = subData?.submissions ?? [];
 
@@ -86,12 +90,14 @@ export default function AssignmentDetailPage() {
     queryClient.invalidateQueries('assignment');
     queryClient.invalidateQueries('assignments');
     queryClient.invalidateQueries('submissions');
+    queryClient.invalidateQueries('scores');
+    queryClient.invalidateQueries('grades');
     queryClient.invalidateQueries('dashboard-stats');
   };
 
   const back = (
-    <Link to="/assignments" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
-      <ArrowLeft className="w-4 h-4 mr-1" /> Assignments
+    <Link to="/coursework?type=assignment" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
+      <ArrowLeft className="w-4 h-4 mr-1" /> Coursework
     </Link>
   );
 
@@ -193,6 +199,7 @@ export default function AssignmentDetailPage() {
           <div className="space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
               <Badge variant="outline">{assignment.course_code}</Badge>
+              {inPerson && <InPersonBadge />}
               {canManage && (
                 <Badge variant={assignment.is_published ? 'success' : 'warning'}>
                   {assignment.is_published ? 'Published' : 'Draft'}
@@ -202,7 +209,9 @@ export default function AssignmentDetailPage() {
             </div>
             <h1 className="text-2xl font-bold">{assignment.title}</h1>
             <p className="text-sm text-muted-foreground">
-              Due {formatDateTime(assignment.due_date)} · {assignment.max_score} points
+              {inPerson
+                ? `${formatDateTime(assignment.due_date)}${assignment.room ? ` · ${formatRoom(assignment.room)}` : ''} · ${assignment.max_score} points`
+                : `Due ${formatDateTime(assignment.due_date)} · ${assignment.max_score} points`}
             </p>
             {assignment.instructions && (
               <p className="text-sm max-w-2xl whitespace-pre-wrap break-words">{assignment.instructions}</p>
@@ -257,7 +266,32 @@ export default function AssignmentDetailPage() {
         )}
       </div>
 
-      {isStudent && (
+      {isStudent && inPerson && (
+        <section className="space-y-4">
+          <h2 className="text-xl font-bold">Your score</h2>
+          <MyScoreCard
+            status={assignment.status}
+            score={assignment.manual_score}
+            max={assignment.max_score}
+            percent={assignment.manual_percent}
+            feedback={assignment.manual_feedback}
+            gradedAt={assignment.manual_graded_at}
+          />
+        </section>
+      )}
+
+      {canManage && inPerson && (
+        <section className="space-y-4">
+          <h2 className="text-xl font-bold">Scores</h2>
+          <p className="text-sm text-muted-foreground">
+            This assignment is checked face to face. Enter each student’s score afterwards; students see their own
+            score and comment, and are notified when it appears.
+          </p>
+          <ScoreSheet type="assignment" itemId={assignment.id} />
+        </section>
+      )}
+
+      {isStudent && !inPerson && (
         <section className="space-y-4">
           <h2 className="text-xl font-bold">Your work</h2>
           <Card className="p-5 space-y-4">
@@ -354,7 +388,7 @@ export default function AssignmentDetailPage() {
         </section>
       )}
 
-      {!isStudent && (
+      {!isStudent && !inPerson && (
         <section className="space-y-4">
           <h2 className="text-xl font-bold">Submissions</h2>
           {!canManage ? (

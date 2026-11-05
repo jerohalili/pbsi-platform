@@ -15,6 +15,9 @@ export function AssignmentStatusBadge({ status, isLate }: AssignmentStatusBadgeP
       {status === 'submitted' && <Badge variant="default">Submitted</Badge>}
       {status === 'not_submitted' && <Badge variant="outline">Not submitted</Badge>}
       {status === 'overdue' && <Badge variant="destructive">Overdue</Badge>}
+      {status === 'scored' && <Badge variant="success">Scored</Badge>}
+      {status === 'awaiting_score' && <Badge variant="warning">Awaiting score</Badge>}
+      {status === 'upcoming' && <Badge variant="outline">Upcoming</Badge>}
       {isLate && (status === 'submitted' || status === 'graded') && <Badge variant="warning">Late</Badge>}
     </span>
   );

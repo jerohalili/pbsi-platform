@@ -68,12 +68,13 @@ export async function listGrades(_req: Request, res: Response): Promise<void> {
     SELECT g.id, g.student_id, g.course_id, g.assessment_type, g.assessment_id,
            g.score, g.feedback, g.term, g.created_at,
            c.code as course_code, c.name as course_name,
-           COALESCE(q.title, a.title) AS assessment_title,
+           COALESCE(q.title, a.title, ex.title) AS assessment_title,
            s.student_id AS student_number, p.first_name, p.last_name
     FROM grades g
     JOIN courses c ON c.id = g.course_id
     LEFT JOIN quizzes q ON g.assessment_type = 'quiz' AND q.id = g.assessment_id
     LEFT JOIN assignments a ON g.assessment_type = 'assignment' AND a.id = g.assessment_id
+    LEFT JOIN exams ex ON g.assessment_type = 'exam' AND ex.id = g.assessment_id
     JOIN students s ON s.id = g.student_id
     JOIN profiles p ON p.user_id = s.user_id
     WHERE (${studentParam}::text = '' OR g.student_id = NULLIF(${studentParam}::text, '')::uuid)
@@ -141,6 +142,8 @@ export async function getGradeSummary(req: Request, res: Response): Promise<void
                    AS assignment_average,
                  ROUND((AVG(sc.score) FILTER (WHERE sc.assessment_type = 'quiz'))::numeric, 2)::float8
                    AS quiz_average,
+                 ROUND((AVG(sc.score) FILTER (WHERE sc.assessment_type = 'exam'))::numeric, 2)::float8
+                   AS exam_average,
                  (SELECT COUNT(*) FROM per_student ps
                    WHERE ps.course_id = c.id AND ps.avg_score < ${PASSING_GRADE}::numeric)::int AS at_risk
           FROM scoped sc
@@ -196,11 +199,12 @@ export async function overrideGrade(req: Request, res: Response): Promise<void> 
   const [grade] = await sql`
     SELECT g.id, g.course_id, g.score, g.feedback, g.assessment_type, g.assessment_id,
            s.user_id AS student_user_id,
-           COALESCE(q.title, a.title) AS assessment_title
+           COALESCE(q.title, a.title, ex.title) AS assessment_title
     FROM grades g
     JOIN students s ON s.id = g.student_id
     LEFT JOIN quizzes q ON g.assessment_type = 'quiz' AND q.id = g.assessment_id
     LEFT JOIN assignments a ON g.assessment_type = 'assignment' AND a.id = g.assessment_id
+    LEFT JOIN exams ex ON g.assessment_type = 'exam' AND ex.id = g.assessment_id
     WHERE g.id = ${id}
   `;
   if (!grade) throw httpError(404, 'Grade not found');

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from 'react-query';
 import {
   ArrowDown,
@@ -36,7 +36,10 @@ import { AssignmentStatusBadge } from '@/components/assignments/AssignmentStatus
 import type { AssignmentItem } from '@/components/assignments/types.ts';
 import { QuizFormDialog } from '@/components/quizzes/QuizFormDialog.tsx';
 import { formatTimeLimit, type QuizItem } from '@/components/quizzes/types.ts';
-import { formatDateTime } from '@/lib/utils.ts';
+import { ExamFormDialog } from '@/components/exams/ExamFormDialog.tsx';
+import type { ExamItem } from '@/components/exams/types.ts';
+import { InPersonBadge, ManualStatusBadge } from '@/components/coursework/shared.tsx';
+import { formatDateTime, formatRoom } from '@/lib/utils.ts';
 
 interface Course extends CourseFormValues {
   teacher_first_name: string | null;
@@ -72,6 +75,8 @@ export default function CourseDetailPage() {
   const [assignmentModuleId, setAssignmentModuleId] = useState<string | null>(null);
   const [creatingAssignment, setCreatingAssignment] = useState(false);
   const [creatingQuiz, setCreatingQuiz] = useState(false);
+  const [creatingExam, setCreatingExam] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [creatingModule, setCreatingModule] = useState(false);
   // Collapsed modules show only their title and lesson notes. Everything starts expanded.
   const [collapsedModules, setCollapsedModules] = useState<Set<string>>(new Set());
@@ -118,6 +123,28 @@ export default function CourseDetailPage() {
   const modules = data?.modules ?? [];
   const canEdit = !!course && (isAdmin || (user?.role === 'teacher' && course.is_mine));
 
+  const { data: examData } = useGet<{ exams: ExamItem[] }>(['exams', 'course', id ?? ''], `/exams?course_id=${id}`, {
+    enabled: !!id,
+    staleTime: 0,
+    refetchOnMount: 'always',
+  });
+  const exams = examData?.exams ?? [];
+
+  // The Coursework page's "New" menu links here with ?new=assignment|quiz|exam to open the right dialog.
+  const wanted = searchParams.get('new');
+  useEffect(() => {
+    if (!wanted || !course) return;
+    setSearchParams({}, { replace: true });
+    if (!canEdit) return;
+    if (wanted === 'quiz') setCreatingQuiz(true);
+    else if (wanted === 'exam') setCreatingExam(true);
+    else if (wanted === 'assignment') {
+      if (modules.length > 0) setCreatingAssignment(true);
+      else toast({ title: 'Add a module first', description: 'Assignments belong to a module of the course.', variant: 'destructive' });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wanted, course?.id]);
+
   // Fetch contents for every module so students can read them and teachers can manage them.
   const [allContents, setAllContents] = useState<Record<string, ModuleContent[]>>({});
 
@@ -150,6 +177,7 @@ export default function CourseDetailPage() {
     queryClient.invalidateQueries('courses');
     queryClient.invalidateQueries('assignments');
     queryClient.invalidateQueries('quizzes');
+    queryClient.invalidateQueries('exams');
     await fetchModuleContents();
   };
 
@@ -427,13 +455,23 @@ export default function CourseDetailPage() {
                           {q.title}
                         </Link>
                       )}
+                      {q.delivery === 'in_person' && <InPersonBadge />}
                       {(!isStudent && q.can_manage) && (
                         <Badge variant={q.is_published ? 'success' : 'warning'}>{q.is_published ? 'Published' : 'Draft'}</Badge>
                       )}
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      {q.question_count} {q.question_count === 1 ? 'question' : 'questions'} · {q.total_points} points ·{' '}
-                      {formatTimeLimit(q.time_limit_minutes)}
+                      {q.delivery === 'in_person' ? (
+                        <>
+                          {formatDateTime(q.scheduled_at)}
+                          {q.room ? ` · ${formatRoom(q.room)}` : ''} · {q.max_score} points
+                        </>
+                      ) : (
+                        <>
+                          {q.question_count} {q.question_count === 1 ? 'question' : 'questions'} · {q.total_points} points ·{' '}
+                          {formatTimeLimit(q.time_limit_minutes)}
+                        </>
+                      )}
                     </p>
                   </div>
                   <div className="flex shrink-0 gap-2">
@@ -445,6 +483,11 @@ export default function CourseDetailPage() {
                       <Button asChild size="sm">
                         <Link to={`/quizzes/${q.id}`}>Take quiz</Link>
                       </Button>
+                    ) : isStudent && q.delivery === 'in_person' ? (
+                      <span className="inline-flex items-center gap-2 text-sm">
+                        <ManualStatusBadge status={q.status} />
+                        {q.manual_score !== null && `${q.manual_score} / ${q.max_score}`}
+                      </span>
                     ) : null}
                     {(!isStudent && q.can_manage) && (
                       <Button asChild size="sm" aria-label={`Open quiz ${q.title}`}>
@@ -467,6 +510,62 @@ export default function CourseDetailPage() {
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     )}
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold">Exams</h2>
+          {canEdit && (
+            <Button onClick={() => setCreatingExam(true)}>
+              <Plus className="w-4 h-4 mr-2" /> New exam
+            </Button>
+          )}
+        </div>
+
+        {exams.length === 0 ? (
+          <Card className="p-8 text-center text-muted-foreground">
+            <p>No exams yet.</p>
+            {canEdit && <p className="text-sm mt-1">Announce an exam with its date and room, then enter the scores after it.</p>}
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {exams.map((x) => (
+              <Card key={x.id} className="p-4">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Link to={`/exams/${x.id}`} className="font-medium hover:underline">
+                        {x.title}
+                      </Link>
+                      <InPersonBadge />
+                      {(!isStudent && x.can_manage) && (
+                        <Badge variant={x.is_published ? 'success' : 'warning'}>{x.is_published ? 'Published' : 'Draft'}</Badge>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {formatDateTime(x.exam_at)}
+                      {x.room ? ` · ${formatRoom(x.room)}` : ''} · Max {x.max_score}
+                      {x.can_manage && x.is_published && x.scored_count !== null && ` · ${x.scored_count} of ${x.enrolled_count} scored`}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 gap-2 items-center">
+                    {isStudent && (
+                      <span className="inline-flex items-center gap-2 text-sm">
+                        <ManualStatusBadge status={x.status} />
+                        {x.my_score !== null && `${x.my_score} / ${x.max_score}`}
+                      </span>
+                    )}
+                    <Button asChild size="sm" variant="outline" aria-label={`Open exam ${x.title}`}>
+                      <Link to={`/exams/${x.id}`}>
+                        Open <ArrowRight className="w-4 h-4 ml-2" />
+                      </Link>
+                    </Button>
                   </div>
                 </div>
               </Card>
@@ -512,11 +611,15 @@ export default function CourseDetailPage() {
                       {(!isStudent && a.can_manage) && (
                         <Badge variant={a.is_published ? 'success' : 'warning'}>{a.is_published ? 'Published' : 'Draft'}</Badge>
                       )}
+                      {a.delivery === 'in_person' && <InPersonBadge />}
                       <span className="text-xs text-muted-foreground truncate">Module: {a.module_title}</span>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Due {formatDateTime(a.due_date)} · Max {a.max_score}
+                      {a.delivery === 'in_person'
+                        ? `${formatDateTime(a.due_date)}${a.room ? ` · ${formatRoom(a.room)}` : ''} · Max ${a.max_score}`
+                        : `Due ${formatDateTime(a.due_date)} · Max ${a.max_score}`}
                       {a.grade !== null && ` · Your grade: ${a.grade}`}
+                      {a.manual_score !== null && ` · Your score: ${a.manual_score}`}
                     </p>
                     {a.status && <AssignmentStatusBadge status={a.status} isLate={a.is_late} />}
                   </div>
@@ -568,6 +671,22 @@ export default function CourseDetailPage() {
         onSaved={() => {
           refresh();
           toast({ title: 'Course updated', variant: 'success' });
+        }}
+      />
+
+      <ExamFormDialog
+        open={creatingExam}
+        onOpenChange={setCreatingExam}
+        mode="create"
+        courseId={course.id}
+        onSaved={(exam) => {
+          refresh();
+          toast({
+            title: 'Exam created as a draft',
+            description: 'Open it and press Publish when students should see it.',
+            variant: 'success',
+          });
+          navigate(`/exams/${exam.id}`);
         }}
       />
 

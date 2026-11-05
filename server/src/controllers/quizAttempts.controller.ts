@@ -20,7 +20,7 @@ function currentUser(req: Request): AuthUser {
 /** The quiz a student is allowed to take: published, and in a course they are enrolled in. */
 async function loadQuizForStudent(studentId: string, quizId: string) {
   const [quiz] = await sql`
-    SELECT id, course_id, is_published, time_limit_minutes FROM quizzes WHERE id = ${quizId}
+    SELECT id, course_id, is_published, time_limit_minutes, delivery FROM quizzes WHERE id = ${quizId}
   `;
   // An unpublished quiz does not exist as far as students are concerned.
   if (!quiz || quiz.is_published !== true) throw httpError(404, 'Quiz not found');
@@ -29,6 +29,10 @@ async function loadQuizForStudent(studentId: string, quizId: string) {
     SELECT 1 AS ok FROM enrollments WHERE course_id = ${quiz.course_id} AND student_id = ${studentId}
   `;
   if (!enrolled) throw httpError(404, 'Quiz not found');
+  // Taken face to face: there is nothing to answer online.
+  if (quiz.delivery === 'in_person') {
+    throw httpError(409, 'This quiz is taken in person, so there is nothing to answer online.');
+  }
   return quiz as { id: string; course_id: string; is_published: boolean; time_limit_minutes: number | null };
 }
 

@@ -6,7 +6,7 @@ import useAuth from '@/hooks/useAuth.ts';
 import { useGet } from '@/hooks/useApi.ts';
 import api from '@/lib/api.ts';
 import { getErrorMessage } from '@/lib/errors.ts';
-import { formatDateTime } from '@/lib/utils.ts';
+import { formatDateTime, formatRoom } from '@/lib/utils.ts';
 import { useToast } from '@/components/ui/toast.tsx';
 import { Badge } from '@/components/ui/badge.tsx';
 import { Button } from '@/components/ui/button.tsx';
@@ -23,6 +23,8 @@ import {
   type QuizQuestion,
 } from '@/components/quizzes/types.ts';
 import { ConfirmDialog } from '@/components/users/ConfirmDialog.tsx';
+import { InPersonBadge, InPersonInfo, MyScoreCard } from '@/components/coursework/shared.tsx';
+import { ScoreSheet } from '@/components/coursework/ScoreSheet.tsx';
 
 interface AttemptRow {
   student_id: string;
@@ -60,11 +62,13 @@ export default function QuizDetailPage() {
   const quiz = data?.quiz;
   const questions = data?.questions ?? [];
   const canManage = !isStudent && !!quiz?.can_manage;
+  // Announced only: no online questions or attempts, the teacher types in the scores.
+  const inPerson = quiz?.delivery === 'in_person';
 
   const { data: attemptData, isLoading: attemptsLoading } = useGet<{ attempts: AttemptRow[] }>(
     ['quiz-attempts', id ?? ''],
     `/quiz-attempts?quiz_id=${id}`,
-    { enabled: !!id && canManage },
+    { enabled: !!id && canManage && !inPerson },
   );
   const attempts = attemptData?.attempts ?? [];
 
@@ -72,11 +76,13 @@ export default function QuizDetailPage() {
     queryClient.invalidateQueries('quiz');
     queryClient.invalidateQueries('quizzes');
     queryClient.invalidateQueries('quiz-attempts');
+    queryClient.invalidateQueries('scores');
+    queryClient.invalidateQueries('grades');
   };
 
   const back = (
-    <Link to="/quizzes" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
-      <ArrowLeft className="w-4 h-4 mr-1" /> Quizzes
+    <Link to="/coursework?type=quiz" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
+      <ArrowLeft className="w-4 h-4 mr-1" /> Coursework
     </Link>
   );
 
@@ -145,17 +151,37 @@ export default function QuizDetailPage() {
           <div className="space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
               <Badge variant="outline">{quiz.course_code}</Badge>
+              {inPerson && <InPersonBadge />}
               {canManage && <Badge variant={quiz.is_published ? 'success' : 'warning'}>{quiz.is_published ? 'Published' : 'Draft'}</Badge>}
             </div>
             <h1 className="text-2xl font-bold">{quiz.title}</h1>
-            <p className="text-sm text-muted-foreground">
-              {quiz.question_count} {quiz.question_count === 1 ? 'question' : 'questions'} · {quiz.total_points} points ·{' '}
-              {formatTimeLimit(quiz.time_limit_minutes)}
-            </p>
+            {inPerson ? (
+              <p className="text-sm text-muted-foreground">
+                {formatDateTime(quiz.scheduled_at)}
+                {quiz.room ? ` · ${formatRoom(quiz.room)}` : ''} · {quiz.max_score} points
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {quiz.question_count} {quiz.question_count === 1 ? 'question' : 'questions'} · {quiz.total_points} points ·{' '}
+                {formatTimeLimit(quiz.time_limit_minutes)}
+              </p>
+            )}
+            {!inPerson && quiz.details && (
+              <p className="text-sm max-w-2xl whitespace-pre-wrap break-words">{quiz.details}</p>
+            )}
           </div>
           {canManage && (
             <div className="flex gap-2 shrink-0 flex-wrap">
-              <Button onClick={togglePublish} disabled={publishing} variant={quiz.is_published ? 'outline' : 'default'}>
+              <Button
+                onClick={togglePublish}
+                disabled={publishing || (inPerson && quiz.is_published && (quiz.scored_count ?? 0) > 0)}
+                variant={quiz.is_published ? 'outline' : 'default'}
+                title={
+                  inPerson && quiz.is_published && (quiz.scored_count ?? 0) > 0
+                    ? 'Scores have already been recorded, so this quiz can no longer be unpublished.'
+                    : undefined
+                }
+              >
                 {quiz.is_published ? 'Unpublish' : 'Publish'}
               </Button>
               <Button onClick={() => setEditingQuiz(true)}>
@@ -170,9 +196,49 @@ export default function QuizDetailPage() {
           )}
         </div>
         {publishError && <p className="text-sm text-destructive">{publishError}</p>}
+        {canManage && !quiz.is_published && (
+          <p className="text-sm text-muted-foreground">
+            This quiz is a draft. Students can’t see it, and won’t be notified, until you publish it.
+          </p>
+        )}
       </div>
 
-      {isStudent && (
+      {inPerson && (
+        <InPersonInfo
+          whenLabel="Takes place"
+          when={quiz.scheduled_at}
+          room={quiz.room}
+          maxScore={quiz.max_score}
+          details={quiz.details}
+        />
+      )}
+
+      {isStudent && inPerson && (
+        <section className="space-y-4">
+          <h2 className="text-xl font-bold">Your score</h2>
+          <MyScoreCard
+            status={quiz.status}
+            score={quiz.manual_score}
+            max={quiz.max_score}
+            percent={quiz.manual_percent}
+            feedback={quiz.manual_feedback}
+            gradedAt={quiz.manual_graded_at}
+          />
+        </section>
+      )}
+
+      {canManage && inPerson && (
+        <section className="space-y-4">
+          <h2 className="text-xl font-bold">Scores</h2>
+          <p className="text-sm text-muted-foreground">
+            This quiz is taken face to face. Enter each student’s score afterwards; students see their own score and
+            comment, and are notified when it appears.
+          </p>
+          <ScoreSheet type="quiz" itemId={quiz.id} />
+        </section>
+      )}
+
+      {isStudent && !inPerson && (
         <Card className="p-6 space-y-4">
           {quiz.status === 'completed' && quiz.attempt_id ? (
             <>
@@ -206,7 +272,7 @@ export default function QuizDetailPage() {
         </Card>
       )}
 
-      {canManage && (
+      {canManage && !inPerson && (
         <>
           <section className="space-y-4">
             <div className="flex items-center justify-between">
@@ -381,7 +447,11 @@ export default function QuizDetailPage() {
           open
           onOpenChange={(open) => !open && setDeletingQuiz(false)}
           title="Delete this quiz?"
-          description={`“${quiz.title}” and all its questions and attempts will be removed permanently.`}
+          description={
+            inPerson
+              ? `“${quiz.title}” and every score entered for it will be removed permanently, and those grades disappear from the Grades page.`
+              : `“${quiz.title}” and all its questions and attempts will be removed permanently.`
+          }
           confirmLabel="Delete"
           destructive
           onConfirm={confirmDeleteQuiz}

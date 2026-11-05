@@ -68,6 +68,10 @@ export async function listSubmissions(req: Request, res: Response): Promise<void
   const assignmentId = parseUuid((req.query as { assignment_id?: string }).assignment_id, 'assignment id');
 
   const assignment = await assertCanManageAssignment(user, assignmentId);
+  // An in-person assignment has no hand-ins: its scores are typed on the score sheet instead.
+  if (assignment.delivery === 'in_person') {
+    throw httpError(409, 'This assignment is checked in person. Enter its scores on the score sheet.');
+  }
 
   const submissions = await sql`
     SELECT st.id AS student_id, st.student_id AS student_number,

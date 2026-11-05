@@ -51,6 +51,7 @@ interface CourseSummary {
   lowest: number | null;
   assignment_average: number | null;
   quiz_average: number | null;
+  exam_average: number | null;
   at_risk: number;
 }
 
@@ -375,6 +376,7 @@ export default function GradesPage() {
                         <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-site-muted">
                           <span>Assignments: {formatAverage(c.assignment_average)}</span>
                           <span>Quizzes: {formatAverage(c.quiz_average)}</span>
+                          <span>Exams: {formatAverage(c.exam_average)}</span>
                           <span>{c.items} item{c.items === 1 ? '' : 's'}</span>
                         </div>
                         {canManage && (
@@ -442,9 +444,10 @@ export default function GradesPage() {
                 ))}
               </select>
               <select aria-label="Filter by type" value={type} onChange={(e) => setType(e.target.value)} className={CONTROL_CLASS}>
-                <option value="">Assignments and quizzes</option>
+                <option value="">Assignments, quizzes and exams</option>
                 <option value="assignment">Assignments</option>
                 <option value="quiz">Quizzes</option>
+                <option value="exam">Exams</option>
               </select>
               <select aria-label="Sort grades" value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className={CONTROL_CLASS}>
                 <option value="newest">Newest first</option>

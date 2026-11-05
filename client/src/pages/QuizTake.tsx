@@ -134,7 +134,7 @@ export default function QuizTakePage() {
   // left (the deadline is fixed on the server, so a reload or another device cannot restart it), the
   // answers saved so far, and, only now, the questions.
   useEffect(() => {
-    if (!quiz || quiz.status === 'completed' || startedRef.current) return;
+    if (!quiz || quiz.status === 'completed' || quiz.delivery === 'in_person' || startedRef.current) return;
     if (user && user.role !== 'student') return;
     startedRef.current = true;
     setStartError('');
@@ -250,6 +250,9 @@ export default function QuizTakePage() {
   }
 
   // One attempt only: anyone who already finished goes straight to their result.
+  // An in-person quiz has nothing to answer online: send the student to its page.
+  if (quiz.delivery === 'in_person') return <Navigate to={`/quizzes/${quiz.id}`} replace />;
+
   if (quiz.status === 'completed' && quiz.attempt_id) {
     return <Navigate to={`/quiz-results/${quiz.attempt_id}`} replace />;
   }

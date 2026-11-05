@@ -50,3 +50,9 @@ export function toLocalInputValue(iso: string): string {
 export function localInputToIso(value: string): string {
   return new Date(value).toISOString();
 }
+
+/** A room as people type it ("204", "Room 204", "Lab 3"): "Room " is added only to a bare number or name. */
+export function formatRoom(room: string): string {
+  const trimmed = room.trim();
+  return /^(room|rm|lab|laboratory|hall|gym|auditorium|library)\b/i.test(trimmed) ? trimmed : `Room ${trimmed}`;
+}

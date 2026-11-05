@@ -110,10 +110,14 @@ export const createAssignmentSchema = z.object({
     .max(1000, 'Max score is too large')
     .default(100),
   attachment_url: z.string().trim().max(2000).optional(),
+  // 'in_person': only announced on the site (the due date is then when it takes place); nothing is
+  // handed in online and the teacher types each student's score afterwards. Chosen when creating.
+  delivery: z.enum(['online', 'in_person']).default('online'),
+  room: z.string().trim().max(100).optional(),
 });
 
 export const updateAssignmentSchema = createAssignmentSchema
-  .omit({ module_id: true })
+  .omit({ module_id: true, delivery: true })
   .partial()
   // A real boolean on purpose (same as quizzes): z.coerce.boolean() would turn "false" into true.
   // New assignments are always drafts, so this can only be sent when editing.
@@ -132,14 +136,31 @@ export const gradeSubmissionSchema = z.object({
 
 // ---- Quizzes ---------------------------------------------------------------
 
-export const createQuizSchema = z.object({
-  course_id: z.string().uuid('Invalid course ID'),
-  title: z.string().trim().min(1, 'Quiz title is required').max(200),
-  // Minutes; null or omitted = no time limit.
-  time_limit_minutes: z
-    .union([z.null(), z.coerce.number().int().min(1, 'Time limit must be at least 1 minute').max(600)])
-    .optional(),
-});
+export const createQuizSchema = z
+  .object({
+    course_id: z.string().uuid('Invalid course ID'),
+    title: z.string().trim().min(1, 'Quiz title is required').max(200),
+    // Minutes; null or omitted = no time limit.
+    time_limit_minutes: z
+      .union([z.null(), z.coerce.number().int().min(1, 'Time limit must be at least 1 minute').max(600)])
+      .optional(),
+    // 'in_person': announced on the site (date, room, details) with no online questions; the
+    // teacher types each student's score afterwards. Chosen when creating.
+    delivery: z.enum(['online', 'in_person']).default('online'),
+    scheduled_at: z.string().datetime({ offset: true, message: 'Invalid date' }).optional(),
+    room: z.string().trim().max(100).optional(),
+    details: z.string().trim().max(5000).optional(),
+    max_score: z.coerce.number().positive('Max score must be positive').max(1000, 'Max score is too large').default(100),
+  })
+  .superRefine((quiz, ctx) => {
+    if (quiz.delivery !== 'in_person') return;
+    if (!quiz.scheduled_at) {
+      ctx.addIssue({ code: 'custom', path: ['scheduled_at'], message: 'Choose when the quiz takes place' });
+    }
+    if (quiz.time_limit_minutes) {
+      ctx.addIssue({ code: 'custom', path: ['time_limit_minutes'], message: 'An in-person quiz has no online time limit' });
+    }
+  });
 
 export const updateQuizSchema = z.object({
   title: z.string().trim().min(1, 'Quiz title is required').max(200).optional(),
@@ -148,6 +169,48 @@ export const updateQuizSchema = z.object({
     .optional(),
   // A real boolean on purpose: z.coerce.boolean() would turn the string "false" into true.
   is_published: z.boolean().optional(),
+  // undefined = unchanged, '' = clear. The date, room and max score only exist for in-person quizzes.
+  details: z.string().trim().max(5000).optional(),
+  scheduled_at: z.string().datetime({ offset: true, message: 'Invalid date' }).optional(),
+  room: z.string().trim().max(100).optional(),
+  max_score: z.coerce.number().positive('Max score must be positive').max(1000, 'Max score is too large').optional(),
+});
+
+// ---- Exams (always in person, scored by hand) -----------------------------------------------------
+
+export const createExamSchema = z.object({
+  course_id: z.string().uuid('Invalid course ID'),
+  title: z.string().trim().min(1, 'Exam title is required').max(200),
+  // Coverage, what to bring, reminders.
+  details: z.string().trim().max(10000).optional(),
+  exam_at: z.string().datetime({ offset: true, message: 'Invalid exam date' }),
+  duration_minutes: z
+    .union([z.null(), z.coerce.number().int().min(1, 'Duration must be at least 1 minute').max(720)])
+    .optional(),
+  room: z.string().trim().max(100).optional(),
+  max_score: z.coerce.number().positive('Max score must be positive').max(1000, 'Max score is too large').default(100),
+});
+
+export const updateExamSchema = createExamSchema
+  .omit({ course_id: true })
+  .partial()
+  // A real boolean on purpose: z.coerce.boolean() would turn the string "false" into true.
+  .extend({ is_published: z.boolean().optional() });
+
+// ---- Manual scores (exams and in-person assignments / quizzes) --------------------------------------
+
+export const saveScoresSchema = z.object({
+  scores: z
+    .array(
+      z.object({
+        student_id: z.string().uuid('Invalid student ID'),
+        // null clears that student's score. The upper bound is the item's own max score (controller).
+        score: z.number({ invalid_type_error: 'A score must be a number' }).finite().min(0, 'Score can’t be negative').nullable(),
+        feedback: z.string().trim().max(2000).nullable().optional(),
+      }),
+    )
+    .min(1, 'Nothing to save')
+    .max(500, 'Too many students in one request'),
 });
 
 export const questionInputSchema = z
@@ -274,6 +337,7 @@ export const NOTIFICATION_TYPES = [
   'quiz',
   'attendance',
   'discussion',
+  'exam',
 ] as const;
 
 // A link is an in-app path ("/grades") or a full web address; "" means no link.

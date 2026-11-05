@@ -1,3 +1,5 @@
+import type { Delivery, ManualStatus } from '@/components/assignments/types.ts';
+
 export type QuestionType = 'mcq' | 'true_false' | 'short_answer';
 
 export const QUESTION_TYPE_LABEL: Record<QuestionType, string> = {
@@ -14,6 +16,12 @@ export interface QuizItem {
   time_limit_minutes: number | null;
   is_published: boolean;
   created_at: string;
+  /** 'in_person': announced only (no online questions); the teacher types in each score. */
+  delivery: Delivery;
+  scheduled_at: string | null;
+  room: string | null;
+  details: string | null;
+  max_score: number;
   course_code: string;
   course_name: string;
   is_mine: boolean;
@@ -23,11 +31,18 @@ export interface QuizItem {
   /** Only people who manage the quiz get class-wide numbers. */
   attempt_count: number | null;
   average_score: number | null;
+  /** In-person quizzes: typed-in scores, out of the students enrolled. */
+  scored_count: number | null;
+  enrolled_count: number | null;
+  manual_score: number | null;
+  manual_percent?: number | null;
+  manual_feedback: string | null;
+  manual_graded_at: string | null;
   /** Only students get their own attempt and a status. */
   attempt_id: string | null;
   my_score: number | null;
   my_submitted_at: string | null;
-  status: 'completed' | 'not_taken' | null;
+  status: 'completed' | 'not_taken' | ManualStatus | null;
 }
 
 export interface QuizQuestion {

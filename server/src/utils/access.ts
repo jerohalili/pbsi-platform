@@ -120,6 +120,7 @@ export interface ManagedAssignment {
   due_date: string;
   course_id: string;
   is_published: boolean;
+  delivery: 'online' | 'in_person';
 }
 
 /**
@@ -131,7 +132,7 @@ export async function assertCanManageAssignment(
   assignmentId: string,
 ): Promise<ManagedAssignment> {
   const [a] = await sql`
-    SELECT a.id, a.title, a.max_score::float8 AS max_score, a.due_date, a.is_published,
+    SELECT a.id, a.title, a.max_score::float8 AS max_score, a.due_date, a.is_published, a.delivery,
            m.course_id, te.user_id AS teacher_user_id
     FROM assignments a
     JOIN modules m ON m.id = a.module_id
@@ -150,6 +151,7 @@ export async function assertCanManageAssignment(
     due_date: a.due_date as string,
     course_id: a.course_id as string,
     is_published: a.is_published as boolean,
+    delivery: a.delivery as 'online' | 'in_person',
   };
 }
 
@@ -179,7 +181,7 @@ export async function assertCanViewAssignment(user: AuthUser, assignmentId: stri
  */
 export async function assertStudentCanHandIn(studentId: string, assignmentId: string): Promise<void> {
   const [a] = await sql`
-    SELECT a.id
+    SELECT a.id, a.delivery
     FROM assignments a
     JOIN modules m ON m.id = a.module_id
     WHERE a.id = ${assignmentId}
@@ -189,6 +191,10 @@ export async function assertStudentCanHandIn(studentId: string, assignmentId: st
       )
   `;
   if (!a) throw httpError(404, 'Assignment not found');
+  // An in-person assignment is checked face to face; there is nothing to hand in online.
+  if (a.delivery === 'in_person') {
+    throw httpError(409, 'This assignment is checked in person, so there is nothing to hand in online.');
+  }
 }
 
 export interface ManagedQuiz {
@@ -197,6 +203,7 @@ export interface ManagedQuiz {
   title: string;
   is_published: boolean;
   time_limit_minutes: number | null;
+  delivery: 'online' | 'in_person';
 }
 
 /**
@@ -205,7 +212,7 @@ export interface ManagedQuiz {
  */
 export async function assertCanManageQuiz(user: AuthUser, quizId: string): Promise<ManagedQuiz> {
   const [q] = await sql`
-    SELECT q.id, q.course_id, q.title, q.is_published, q.time_limit_minutes,
+    SELECT q.id, q.course_id, q.title, q.is_published, q.time_limit_minutes, q.delivery,
            te.user_id AS teacher_user_id
     FROM quizzes q
     JOIN courses c ON c.id = q.course_id
@@ -222,6 +229,7 @@ export async function assertCanManageQuiz(user: AuthUser, quizId: string): Promi
     title: q.title as string,
     is_published: q.is_published as boolean,
     time_limit_minutes: q.time_limit_minutes as number | null,
+    delivery: q.delivery as 'online' | 'in_person',
   };
 }
 
@@ -248,6 +256,11 @@ export async function assertCanManageTimetableEntry(
 
 /** Once a student has taken a quiz its questions are frozen, so graded results stay meaningful. */
 export async function assertQuizQuestionsEditable(quizId: string): Promise<void> {
+  // An in-person quiz has no online questions at all: it is only announced and scored by hand.
+  const [kind] = await sql`SELECT delivery FROM quizzes WHERE id = ${quizId}`;
+  if (kind?.delivery === 'in_person') {
+    throw httpError(409, 'An in-person quiz has no online questions: it is announced here and scored by hand.');
+  }
   const [row] = await sql`SELECT COUNT(*)::int AS n FROM quiz_attempts WHERE quiz_id = ${quizId}`;
   if (row && row.n > 0) {
     throw httpError(

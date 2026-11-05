@@ -23,9 +23,9 @@ import StudentDetail from '@/pages/StudentDetail.tsx';
 import Courses from '@/pages/Courses.tsx';
 import CourseDetail from '@/pages/CourseDetail.tsx';
 import ModuleEdit from '@/pages/ModuleEdit.tsx';
-import Assignments from '@/pages/Assignments.tsx';
+import Coursework from '@/pages/Coursework.tsx';
+import ExamDetail from '@/pages/ExamDetail.tsx';
 import AssignmentDetail from '@/pages/AssignmentDetail.tsx';
-import Quizzes from '@/pages/Quizzes.tsx';
 import QuizDetail from '@/pages/QuizDetail.tsx';
 import QuizTake from '@/pages/QuizTake.tsx';
 import QuizResult from '@/pages/QuizResult.tsx';
@@ -78,9 +78,13 @@ const App = () => {
           <Route path="courses" element={<ProtectedRoute><Courses /></ProtectedRoute>} />
           <Route path="courses/:id" element={<ProtectedRoute><CourseDetail /></ProtectedRoute>} />
           <Route path="courses/:courseId/modules/:moduleId/edit" element={<ProtectedRoute><ModuleEdit /></ProtectedRoute>} />
-          <Route path="assignments" element={<ProtectedRoute><Assignments /></ProtectedRoute>} />
+          <Route path="coursework" element={<ProtectedRoute><Coursework /></ProtectedRoute>} />
+          {/* The three lists became one page; old links and bookmarks still arrive in the right tab. */}
+          <Route path="assignments" element={<Navigate to="/coursework?type=assignment" replace />} />
+          <Route path="quizzes" element={<Navigate to="/coursework?type=quiz" replace />} />
+          <Route path="exams" element={<Navigate to="/coursework?type=exam" replace />} />
+          <Route path="exams/:id" element={<ProtectedRoute><ExamDetail /></ProtectedRoute>} />
           <Route path="assignments/:id" element={<ProtectedRoute><AssignmentDetail /></ProtectedRoute>} />
-          <Route path="quizzes" element={<ProtectedRoute><Quizzes /></ProtectedRoute>} />
           <Route path="quizzes/:id" element={<ProtectedRoute><QuizDetail /></ProtectedRoute>} />
           <Route path="quizzes/:id/take" element={<ProtectedRoute><QuizTake /></ProtectedRoute>} />
           <Route path="quiz-results/:attemptId" element={<ProtectedRoute><QuizResult /></ProtectedRoute>} />
