@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from 'react-query';
 import { AuthProvider } from '@/contexts/AuthContext.tsx';
 import { ToastProvider } from '@/components/ui/toast.tsx';
+import { ServerStatusOverlay } from '@/components/common/ServerStatusOverlay.tsx';
 import App from './App.tsx';
 import './index.css';
 
@@ -24,6 +25,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <App />
           {/* The toast host. Without it toast() has nowhere to draw, and no confirmation message ever showed. */}
           <ToastProvider>{null}</ToastProvider>
+          {/* "PBSI is waking up" over any page when the server stops answering. */}
+          <ServerStatusOverlay />
         </AuthProvider>
       </QueryClientProvider>
     </BrowserRouter>

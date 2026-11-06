@@ -1,8 +1,12 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import { configureServerStatus, noteRequestEnd, noteRequestStart } from '@/lib/serverStatus.ts';
 
 const rawApiUrl = import.meta.env.VITE_API_URL || '/api';
 // Normalize so baseURL always ends with /api (handles both with and without trailing /api)
 export const API_BASE_URL = rawApiUrl.replace(/\/+$/, '').replace(/\/api$/, '') + '/api';
+
+// Lets the app notice a sleeping server (see lib/serverStatus.ts).
+configureServerStatus({ healthUrl: `${API_BASE_URL}/health` });
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -29,6 +33,7 @@ function onRefreshFailed(reason: unknown) {
 }
 
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  noteRequestStart(config);
   const token = localStorage.getItem('access_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -37,8 +42,13 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 });
 
 api.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    noteRequestEnd(res.config, res.status);
+    return res;
+  },
   async (error: AxiosError) => {
+    // No answer at all, or the host's 502/503/504 while the server starts, means "not awake yet".
+    noteRequestEnd(error.config, error.response?.status, axios.isCancel(error));
     const originalRequest = error.config as InternalAxiosRequestConfig & {
       _retry?: boolean;
     };
