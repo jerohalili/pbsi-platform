@@ -8,6 +8,7 @@ import {
 import { comparePassword, hashPassword } from '../utils/password.js';
 import { loginSchema } from '../utils/validation.js';
 import { isTokenRevoked } from '../utils/sessions.js';
+import { recordAudit, recordAuditThrottled } from '../utils/audit.js';
 import type { AppError } from '../middleware/errorHandler.js';
 
 const COOKIE_OPTIONS: Record<string, unknown> = {
@@ -22,6 +23,9 @@ const COOKIE_OPTIONS: Record<string, unknown> = {
 // it the faster answer would tell an attacker which emails have an account (a timing side channel).
 const DUMMY_PASSWORD_HASH = hashPassword('this-is-not-a-real-password');
 
+// At most one failed-login audit row per account per action in this window.
+const FAILED_LOGIN_AUDIT_WINDOW_MINUTES = 5;
+
 export async function login(req: Request, res: Response): Promise<void> {
   // The validation middleware only checks the body; parsing here gives the trimmed, lower-cased email.
   const { email, password } = loginSchema.parse(req.body);
@@ -33,12 +37,19 @@ export async function login(req: Request, res: Response): Promise<void> {
 
   const passwordMatches = await comparePassword(password, user ? user.password_hash : await DUMMY_PASSWORD_HASH);
   if (!user || !passwordMatches) {
+    // Only existing accounts are audited: an unknown email is never stored, so an attacker cannot
+    // flood the table with made-up addresses. The typed email and password are never recorded.
+    if (user) {
+      await recordAuditThrottled(req, user.id, 'login_failed', 'user', user.id, null, FAILED_LOGIN_AUDIT_WINDOW_MINUTES);
+    }
     const err = new Error('Invalid email or password') as AppError;
     err.statusCode = 401;
     throw err;
   }
 
   if (!user.is_active) {
+    // The password was right but the account is switched off.
+    await recordAuditThrottled(req, user.id, 'login_blocked_inactive', 'user', user.id, null, FAILED_LOGIN_AUDIT_WINDOW_MINUTES);
     const err = new Error('Account is deactivated') as AppError;
     err.statusCode = 403;
     throw err;
@@ -57,6 +68,8 @@ export async function login(req: Request, res: Response): Promise<void> {
 
   res.cookie('access_token', accessToken, COOKIE_OPTIONS);
   res.cookie('refresh_token', refreshToken, COOKIE_OPTIONS);
+
+  await recordAudit(req, 'login', 'user', user.id, null, { role: user.role }, user.id);
 
   res.json({
     user: { id: user.id, email: user.email, role: user.role },

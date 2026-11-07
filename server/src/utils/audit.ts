@@ -19,8 +19,10 @@ export function auditStatement(
   entityId: string,
   oldValues: Values,
   newValues: Values,
+  actorIdOverride?: string,
 ) {
-  const actorId = req.user?.id;
+  // Login has no signed-in user yet, so it names the account itself.
+  const actorId = actorIdOverride ?? req.user?.id;
   if (!actorId) throw new Error(`Cannot audit "${action}": the request has no signed-in user`);
   return sql`
     INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, old_values, new_values, ip_address)
@@ -41,11 +43,42 @@ export async function recordAudit(
   entityId: string,
   oldValues: Values,
   newValues: Values,
+  actorIdOverride?: string,
 ): Promise<void> {
   try {
-    await auditStatement(req, action, entityType, entityId, oldValues, newValues);
+    await auditStatement(req, action, entityType, entityId, oldValues, newValues, actorIdOverride);
   } catch (err) {
     console.error(`[audit] failed to write "${action}" for ${entityType} ${entityId}:`, err);
+  }
+}
+
+/**
+ * Like recordAudit, but writes nothing when the same actor already has the same action recorded
+ * within the last `windowMinutes`. Used for failed logins so repeated guesses against one account
+ * cannot flood the table. One statement, so two simultaneous attempts cannot both slip through
+ * unless they start in the same instant (an extra row then is harmless).
+ */
+export async function recordAuditThrottled(
+  req: Request,
+  actorId: string,
+  action: string,
+  entityType: string,
+  entityId: string,
+  newValues: Values,
+  windowMinutes: number,
+): Promise<void> {
+  try {
+    await sql`
+      INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, old_values, new_values, ip_address)
+      SELECT ${actorId}, ${action}, ${entityType}, ${entityId}, NULL, ${json(newValues)}::jsonb, ${req.ip ?? null}
+      WHERE NOT EXISTS (
+        SELECT 1 FROM audit_logs
+        WHERE actor_id = ${actorId} AND action = ${action}
+          AND created_at > now() - make_interval(mins => ${windowMinutes}::int)
+      )
+    `;
+  } catch (err) {
+    console.error(`[audit] failed to write throttled \"${action}\" for ${entityType} ${entityId}:`, err);
   }
 }
 
