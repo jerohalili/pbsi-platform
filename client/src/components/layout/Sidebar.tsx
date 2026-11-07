@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import useAuth from '@/hooks/useAuth.ts';
 import useUnreadNotifications from '@/hooks/useUnreadNotifications.ts';
 import { UserAvatar } from '@/components/common/UserAvatar.tsx';
+import { AnnouncementBanner } from '@/components/announcements/AnnouncementBanner.tsx';
 import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet.tsx';
 import {
   LayoutDashboard,
@@ -22,6 +23,7 @@ import {
   BookOpen,
   Award,
   Settings,
+  Megaphone,
 } from 'lucide-react';
 
 const SidebarCollapsedContext = createContext<{
@@ -54,6 +56,7 @@ const navItems: Array<{
   also?: string[];
 }> = [
   { label: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard size={18} />, roles: ['admin', 'teacher', 'student'] },
+  { label: 'Announcements', href: '/announcements', icon: <Megaphone size={18} />, roles: ['admin', 'teacher'] },
   { label: 'Users', href: '/users', icon: <UserCog size={18} />, roles: ['admin'] },
   { label: 'Students', href: '/students', icon: <Users size={18} />, roles: ['admin', 'teacher'] },
   { label: 'Courses', href: '/courses', icon: <BookOpen size={18} />, roles: ['admin', 'teacher', 'student'] },
@@ -189,15 +192,18 @@ export function TopNav() {
   const { user } = useAuth();
 
   return (
-    <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b border-input bg-background/95 backdrop-blur px-4">
-      <div className="flex items-center gap-3 md:gap-4">
-        <MobileNav />
-        <span className="font-bold text-lg tracking-tight md:hidden">PBSI</span>
-        <span className="hidden sm:block text-sm text-muted-foreground">
-          {(user?.role ?? '').charAt(0).toUpperCase() + (user?.role ?? '').slice(1)} Portal
-        </span>
-      </div>
-    </header>
+    <>
+      <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b border-input bg-background/95 backdrop-blur px-4">
+        <div className="flex items-center gap-3 md:gap-4">
+          <MobileNav />
+          <span className="font-bold text-lg tracking-tight md:hidden">PBSI</span>
+          <span className="hidden sm:block text-sm text-muted-foreground">
+            {(user?.role ?? '').charAt(0).toUpperCase() + (user?.role ?? '').slice(1)} Portal
+          </span>
+        </div>
+      </header>
+      <AnnouncementBanner />
+    </>
   );
 }
 

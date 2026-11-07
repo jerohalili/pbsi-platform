@@ -37,6 +37,7 @@ import DiscussionThread from '@/pages/DiscussionThread.tsx';
 import Notifications from '@/pages/Notifications.tsx';
 import AuditLogs from '@/pages/AuditLogs.tsx';
 import Settings from '@/pages/Settings.tsx';
+import Announcements from '@/pages/Announcements.tsx';
 
 type Role = 'admin' | 'teacher' | 'student';
 
@@ -72,6 +73,7 @@ const App = () => {
         <Route path="/" element={<Home />} />
         <Route element={<RoleLayout />}>
           <Route path="dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="announcements" element={<ProtectedRoute><Announcements /></ProtectedRoute>} />
           <Route path="users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
           <Route path="students" element={<ProtectedRoute><Students /></ProtectedRoute>} />
           <Route path="students/:id" element={<ProtectedRoute><StudentDetail /></ProtectedRoute>} />

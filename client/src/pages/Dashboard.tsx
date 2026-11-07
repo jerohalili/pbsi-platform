@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
+import { DashboardAnnouncements } from '@/components/announcements/DashboardAnnouncements.tsx';
 
 type DashboardRole = 'admin' | 'teacher' | 'student';
 
@@ -126,6 +127,8 @@ export default function Dashboard() {
           ))}
         </div>
       )}
+
+      <DashboardAnnouncements />
 
       {/* Recent activity */}
       <Card className="p-6">
