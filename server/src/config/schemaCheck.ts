@@ -115,3 +115,16 @@ export async function assertUploadSchema(): Promise<void> {
     );
   }
 }
+
+const ANNOUNCEMENTS_SCRIPT = 'server/sql/announcements.sql';
+
+/** Stops the server at startup, with instructions, when the announcements table is missing. */
+export async function assertAnnouncementsSchema(): Promise<void> {
+  const [row] = await sql`SELECT to_regclass('announcements') IS NOT NULL AS has_announcements`;
+  if (!row?.has_announcements) {
+    throw new Error(
+      `The database is not ready for announcements (missing table announcements). ` +
+        `Run ${ANNOUNCEMENTS_SCRIPT} in the Neon SQL editor (safe to run more than once), then restart the server.`,
+    );
+  }
+}

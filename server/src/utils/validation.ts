@@ -513,3 +513,43 @@ export const updateReplySchema = z.object({
 export const discussionReportSchema = z.object({
   reason: z.string().trim().min(3, 'Please say briefly what is wrong').max(500, 'Reason is too long (max 500 characters)'),
 });
+
+// Announcements: an audience (everyone, all teachers, all students, or one course), an optional
+// expiry, and an urgent flag that shows the announcement as a banner until it expires.
+export const ANNOUNCEMENT_AUDIENCES = ['all', 'teachers', 'students', 'course'] as const;
+
+const announcementTitle = z.string().trim().min(1, 'Title is required').max(120, 'The title is too long (max 120 characters)');
+const announcementMessage = z
+  .string()
+  .trim()
+  .min(1, 'Message is required')
+  .max(2000, 'The message is too long (max 2000 characters)');
+const announcementExpiry = z.string().datetime({ offset: true, message: 'Invalid expiry date' });
+
+export const createAnnouncementSchema = z
+  .object({
+    title: announcementTitle,
+    message: announcementMessage,
+    audience: z.enum(ANNOUNCEMENT_AUDIENCES),
+    course_id: z.string().uuid('Invalid course ID').optional(),
+    is_urgent: z.boolean().default(false),
+    expires_at: announcementExpiry.nullable().optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.audience === 'course' && !value.course_id) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['course_id'], message: 'Choose a course' });
+    }
+    if (value.audience !== 'course' && value.course_id) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['course_id'], message: 'Only a course announcement names a course' });
+    }
+  });
+
+export const updateAnnouncementSchema = z
+  .object({
+    title: announcementTitle.optional(),
+    message: announcementMessage.optional(),
+    is_urgent: z.boolean().optional(),
+    // null removes the expiry
+    expires_at: announcementExpiry.nullable().optional(),
+  })
+  .refine((value) => Object.values(value).some((v) => v !== undefined), { message: 'Nothing to change' });
