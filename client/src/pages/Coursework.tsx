@@ -58,6 +58,8 @@ interface Row {
   // What the course's teacher sees
   summary: string | null;
   needsScoring: boolean;
+  /** Notes from the teacher: a student's unseen ones; for the course's teacher, the unresolved ones. */
+  mentionCount: number;
 }
 
 const KIND_LABEL: Record<Kind, string> = { assignment: 'Assignment', quiz: 'Quiz', exam: 'Exam' };
@@ -121,6 +123,7 @@ function fromAssignment(a: AssignmentItem): Row {
     needsScoring: inPerson
       ? unscored(a.is_published, a.due_date, a.scored_count, a.enrolled_count)
       : (a.submitted_count ?? 0) > (a.graded_count ?? 0),
+    mentionCount: a.mention_count ?? 0,
   };
 }
 
@@ -156,6 +159,7 @@ function fromQuiz(q: QuizItem): Row {
       ? scoredSummary(q.scored_count, q.enrolled_count)
       : `${q.attempt_count ?? 0} taken${q.average_score !== null ? ` · average ${q.average_score}%` : ''}`,
     needsScoring: inPerson ? unscored(q.is_published, q.scheduled_at, q.scored_count, q.enrolled_count) : false,
+    mentionCount: q.mention_count ?? 0,
   };
 }
 
@@ -177,6 +181,7 @@ function fromExam(x: ExamItem): Row {
     scoreText: x.my_score !== null ? `${x.my_score} / ${x.max_score}` : null,
     summary: scoredSummary(x.scored_count, x.enrolled_count),
     needsScoring: unscored(x.is_published, x.exam_at, x.scored_count, x.enrolled_count),
+    mentionCount: x.mention_count ?? 0,
   };
 }
 
@@ -267,6 +272,7 @@ export default function CourseworkPage() {
     let list = tab === 'all' ? allRows : allRows.filter((r) => r.kind === tab);
     if (view === 'draft') list = list.filter((r) => r.canManage && !r.published);
     else if (view === 'scoring') list = list.filter((r) => r.canManage && r.needsScoring);
+    else if (view === 'notes') list = list.filter((r) => r.mentionCount > 0);
     else if (view === 'todo' || view === 'waiting' || view === 'done') list = list.filter((r) => r.state === view);
     return sortRows(list, isStudent);
   }, [allRows, tab, view, isStudent]);
@@ -278,6 +284,7 @@ export default function CourseworkPage() {
   const viewOptions = isStudent
     ? [
         { value: '', label: 'Everything' },
+        { value: 'notes', label: 'Needs attention' },
         { value: 'todo', label: 'To do' },
         { value: 'waiting', label: 'Waiting for a score' },
         { value: 'done', label: 'Done' },
@@ -286,6 +293,7 @@ export default function CourseworkPage() {
         { value: '', label: 'Everything' },
         { value: 'draft', label: 'Drafts' },
         { value: 'scoring', label: 'Needs scoring' },
+        { value: 'notes', label: 'Open notes' },
       ];
 
   return (
@@ -397,6 +405,7 @@ export default function CourseworkPage() {
                         {r.title}
                       </Link>
                       {!isStudent && r.canManage && !r.published && <Badge variant="warning">Draft</Badge>}
+                      {isStudent && r.mentionCount > 0 && <Badge variant="warning">New note</Badge>}
                     </div>
                     <div className="flex items-center gap-2 flex-wrap mt-1">
                       <Badge variant="secondary">{KIND_LABEL[r.kind]}</Badge>
@@ -418,6 +427,11 @@ export default function CourseworkPage() {
                       <div className="space-y-1">
                         <p className="text-sm">{r.summary}</p>
                         {r.needsScoring && <Badge variant="warning">Needs scoring</Badge>}
+                        {r.mentionCount > 0 && (
+                          <Badge variant="outline">
+                            {r.mentionCount} open {r.mentionCount === 1 ? 'note' : 'notes'}
+                          </Badge>
+                        )}
                       </div>
                     ) : (
                       <span className="text-sm text-muted-foreground">—</span>

@@ -32,6 +32,19 @@ export function schemaProblems(rows: ColumnRow[]): string[] {
   return problems;
 }
 
+const MENTIONS_SCRIPT = 'server/sql/coursework-mentions.sql';
+
+/** Stops the server at startup, with instructions, when the teacher-mentions table is missing. */
+export async function assertMentionsSchema(): Promise<void> {
+  const [row] = await sql`SELECT to_regclass('coursework_mentions') IS NOT NULL AS has_mentions`;
+  if (!row?.has_mentions) {
+    throw new Error(
+      `The database is not ready for teacher mentions (missing table coursework_mentions). ` +
+        `Run ${MENTIONS_SCRIPT} in the Neon SQL editor (safe to run more than once), then restart the server.`,
+    );
+  }
+}
+
 const COURSEWORK_SCRIPT = 'server/sql/coursework-exams.sql';
 
 /** Stops the server at startup, with instructions, when exams / in-person scoring are not set up yet. */

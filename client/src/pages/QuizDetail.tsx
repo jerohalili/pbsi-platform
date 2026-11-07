@@ -25,6 +25,7 @@ import {
 import { ConfirmDialog } from '@/components/users/ConfirmDialog.tsx';
 import { InPersonBadge, InPersonInfo, MyScoreCard } from '@/components/coursework/shared.tsx';
 import { ScoreSheet } from '@/components/coursework/ScoreSheet.tsx';
+import { MentionsPanel, MyMentions } from '@/components/coursework/mentions.tsx';
 
 interface AttemptRow {
   student_id: string;
@@ -212,6 +213,8 @@ export default function QuizDetailPage() {
           details={quiz.details}
         />
       )}
+
+      {isStudent && <MyMentions itemType="quiz" itemId={quiz.id} />}
 
       {isStudent && inPerson && (
         <section className="space-y-4">
@@ -429,6 +432,16 @@ export default function QuizDetailPage() {
           toast({ title: questionDialog?.question ? 'Question updated' : 'Question added', variant: 'success' });
         }}
       />
+
+      {canManage && (
+        <MentionsPanel
+          itemType="quiz"
+          itemId={quiz.id}
+          courseId={quiz.course_id}
+          itemTitle={quiz.title}
+          isPublished={quiz.is_published}
+        />
+      )}
 
       {deleteQuestionTarget && (
         <ConfirmDialog

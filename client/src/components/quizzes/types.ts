@@ -38,6 +38,8 @@ export interface QuizItem {
   manual_percent?: number | null;
   manual_feedback: string | null;
   manual_graded_at: string | null;
+  /** Notes from the teacher: a student's unseen ones; for the course's teacher, the unresolved ones. */
+  mention_count: number | null;
   /** Only students get their own attempt and a status. */
   attempt_id: string | null;
   my_score: number | null;

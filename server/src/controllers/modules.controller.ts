@@ -10,6 +10,7 @@ import {
 } from '../utils/validation.js';
 import { deleteFromCloudinary } from '../utils/upload.js';
 import { deleteScoresOf } from '../utils/manualScoring.js';
+import { deleteMentionsOf } from '../utils/mentions.js';
 import {
   assertCanManageCourse,
   assertCanManageModule,
@@ -123,6 +124,8 @@ export async function deleteModule(req: Request, res: Response): Promise<void> {
   // Scores typed in for in-person assignments of this module go with them (online work keeps its grades).
   const inPerson = await sql`SELECT id FROM assignments WHERE module_id = ${id} AND delivery = 'in_person'`;
   await deleteScoresOf('assignment', inPerson.map((row) => row.id as string));
+  const inModule = await sql`SELECT id FROM assignments WHERE module_id = ${id}`;
+  await deleteMentionsOf('assignment', inModule.map((row) => row.id as string));
   await sql`DELETE FROM assignments WHERE module_id = ${id}`;
   const [module] = await sql`DELETE FROM modules WHERE id = ${id} RETURNING id`;
   if (!module) throw httpError(404, 'Module not found');

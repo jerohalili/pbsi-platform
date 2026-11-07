@@ -20,6 +20,7 @@ import { recordAudit, diffValues } from '../utils/audit.js';
 import { notifyCourseStudents } from '../utils/notify.js';
 import { autoSubmitExpired } from '../utils/quizSessions.js';
 import { deleteScoresOf } from '../utils/manualScoring.js';
+import { deleteMentionsOf } from '../utils/mentions.js';
 import { formatRoom, formatManila } from '../utils/notify.js';
 import { toPercent } from '../utils/gradeTerm.js';
 import {
@@ -64,6 +65,17 @@ async function queryQuizzes(user: AuthUser, filters: QuizFilters) {
            (SELECT COUNT(*) FROM quiz_attempts a WHERE a.quiz_id = q.id)::int AS attempt_count,
            (SELECT COUNT(*) FROM manual_scores x WHERE x.item_type = 'quiz' AND x.item_id = q.id)::int AS scored_count,
            (SELECT COUNT(*) FROM enrollments en WHERE en.course_id = q.course_id)::int AS enrolled_count,
+           -- Open notes: a student's own that they have not seen yet; for the course's teacher, all unresolved.
+           (CASE
+              WHEN ${isStudent}::boolean THEN (
+                SELECT COUNT(*) FROM coursework_mentions cm
+                WHERE cm.item_type = 'quiz' AND cm.item_id = q.id AND cm.student_id = ${ownStudentId}::uuid
+                  AND cm.resolved_at IS NULL AND cm.acknowledged_at IS NULL)
+              WHEN (te.user_id = ${user.id} OR ${user.role === 'admin'}::boolean) THEN (
+                SELECT COUNT(*) FROM coursework_mentions cm
+                WHERE cm.item_type = 'quiz' AND cm.item_id = q.id AND cm.resolved_at IS NULL)
+              ELSE NULL
+            END)::int AS mention_count,
            CASE WHEN q.delivery = 'in_person'
                 THEN (SELECT ROUND(AVG(x.score / q.max_score * 100), 2)::float8 FROM manual_scores x
                       WHERE x.item_type = 'quiz' AND x.item_id = q.id)
@@ -301,6 +313,7 @@ export async function deleteQuiz(req: Request, res: Response): Promise<void> {
   await sql`DELETE FROM quiz_sessions WHERE quiz_id = ${id}`;
   // The scores typed in for an in-person quiz go with it (online quizzes keep their grades, as before).
   if (before.delivery === 'in_person') await deleteScoresOf('quiz', [id]);
+  await deleteMentionsOf('quiz', [id]);
   const [quiz] = await sql`DELETE FROM quizzes WHERE id = ${id} RETURNING id`;
   if (!quiz) throw httpError(404, 'Quiz not found');
   await deleteManyFromCloudinary(pictures.map((row) => row.image_public_id as string), 'image');

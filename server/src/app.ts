@@ -30,6 +30,7 @@ import dashboardRoutes from './routes/dashboard.routes.js';
 import teacherRoutes from './routes/teachers.routes.js';
 import examRoutes from './routes/exams.routes.js';
 import scoreRoutes from './routes/scores.routes.js';
+import mentionRoutes from './routes/mentions.routes.js';
 
 const app = express();
 
@@ -84,6 +85,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/teachers', teacherRoutes);
 app.use('/api/exams', examRoutes);
 app.use('/api/scores', scoreRoutes);
+app.use('/api/mentions', mentionRoutes);
 
 // 404
 app.use((_req, res) => {

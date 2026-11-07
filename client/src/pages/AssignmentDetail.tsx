@@ -24,6 +24,7 @@ import { isWebUrl, type AssignmentItem, type AssignmentStatus } from '@/componen
 import { ConfirmDialog } from '@/components/users/ConfirmDialog.tsx';
 import { InPersonBadge, MyScoreCard } from '@/components/coursework/shared.tsx';
 import { ScoreSheet } from '@/components/coursework/ScoreSheet.tsx';
+import { MentionDialog, MentionsPanel, MyMentions, type MentionReason } from '@/components/coursework/mentions.tsx';
 
 interface SubmissionRow {
   student_id: string;
@@ -55,6 +56,8 @@ export default function AssignmentDetailPage() {
 
   const [editing, setEditing] = useState(false);
   const [gradeTarget, setGradeTarget] = useState<GradeTarget | null>(null);
+  // The student a note is being written to from a row of the submissions table.
+  const [mentionFor, setMentionFor] = useState<{ studentId: string; reason: MentionReason } | null>(null);
   const [deletingAssignment, setDeletingAssignment] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState('');
@@ -266,6 +269,8 @@ export default function AssignmentDetailPage() {
         )}
       </div>
 
+      {isStudent && <MyMentions itemType="assignment" itemId={assignment.id} />}
+
       {isStudent && inPerson && (
         <section className="space-y-4">
           <h2 className="text-xl font-bold">Your score</h2>
@@ -410,7 +415,7 @@ export default function AssignmentDetailPage() {
                       <TableHead className="w-40">Status</TableHead>
                       <TableHead className="w-48">Handed in</TableHead>
                       <TableHead className="w-24">Grade</TableHead>
-                      <TableHead className="w-28 text-right">Actions</TableHead>
+                      <TableHead className="w-48 text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -452,6 +457,17 @@ export default function AssignmentDetailPage() {
                             {r.grade !== null ? `${r.grade} / ${assignment.max_score}` : '—'}
                           </TableCell>
                           <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              aria-label={`Write a note to ${name}`}
+                              onClick={() =>
+                                setMentionFor({ studentId: r.student_id, reason: status === 'missing' ? 'missed_deadline' : 'comment' })
+                              }
+                            >
+                              Mention
+                            </Button>
                             {r.submission_id && (
                               <Button
                                 variant="outline"
@@ -473,6 +489,7 @@ export default function AssignmentDetailPage() {
                                 {r.grade !== null ? 'Edit grade' : 'Grade'}
                               </Button>
                             )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
@@ -495,6 +512,28 @@ export default function AssignmentDetailPage() {
           toast({ title: 'Assignment updated', variant: 'success' });
         }}
       />
+
+      {canManage && (
+        <>
+          <MentionsPanel
+            itemType="assignment"
+            itemId={assignment.id}
+            courseId={assignment.course_id}
+            itemTitle={assignment.title}
+            isPublished={assignment.is_published}
+          />
+          <MentionDialog
+            open={mentionFor !== null}
+            onOpenChange={(open) => !open && setMentionFor(null)}
+            itemType="assignment"
+            itemId={assignment.id}
+            courseId={assignment.course_id}
+            itemTitle={assignment.title}
+            initialStudentIds={mentionFor ? [mentionFor.studentId] : []}
+            initialReason={mentionFor?.reason}
+          />
+        </>
+      )}
 
       <GradeDialog
         open={gradeTarget !== null}

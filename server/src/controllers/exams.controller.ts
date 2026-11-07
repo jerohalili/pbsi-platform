@@ -11,6 +11,7 @@ import {
 import { recordAudit, diffValues } from '../utils/audit.js';
 import { formatRoom, formatManila, notifyCourseStudents } from '../utils/notify.js';
 import { deleteScoresOf } from '../utils/manualScoring.js';
+import { deleteMentionsOf } from '../utils/mentions.js';
 import { toPercent } from '../utils/gradeTerm.js';
 import type { AuthUser } from '../types/index.js';
 
@@ -42,6 +43,17 @@ async function queryExams(user: AuthUser, filters: ExamFilters) {
            (te.user_id = ${user.id}) AS is_mine,
            (SELECT COUNT(*) FROM manual_scores s WHERE s.item_type = 'exam' AND s.item_id = e.id)::int AS scored_count,
            (SELECT COUNT(*) FROM enrollments en WHERE en.course_id = e.course_id)::int AS enrolled_count,
+           -- Open notes: a student's own that they have not seen yet; for the course's teacher, all unresolved.
+           (CASE
+              WHEN ${isStudent}::boolean THEN (
+                SELECT COUNT(*) FROM coursework_mentions cm
+                WHERE cm.item_type = 'exam' AND cm.item_id = e.id AND cm.student_id = ${ownStudentId}::uuid
+                  AND cm.resolved_at IS NULL AND cm.acknowledged_at IS NULL)
+              WHEN (te.user_id = ${user.id} OR ${user.role === 'admin'}::boolean) THEN (
+                SELECT COUNT(*) FROM coursework_mentions cm
+                WHERE cm.item_type = 'exam' AND cm.item_id = e.id AND cm.resolved_at IS NULL)
+              ELSE NULL
+            END)::int AS mention_count,
            ms.score::float8 AS my_score, ms.feedback AS my_feedback, ms.graded_at AS my_graded_at
     FROM exams e
     JOIN courses c ON c.id = e.course_id
@@ -241,6 +253,7 @@ export async function deleteExam(req: Request, res: Response): Promise<void> {
 
   // The typed-in scores, and the grade rows they created, go with the exam.
   await deleteScoresOf('exam', [id]);
+  await deleteMentionsOf('exam', [id]);
   await sql`DELETE FROM exams WHERE id = ${id}`;
   await recordAudit(req, 'exam.delete', 'exam', id, { title: before.title, course_id: before.course_id }, null);
   res.json({ message: 'Exam deleted' });

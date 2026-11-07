@@ -27,6 +27,7 @@ import type { AuthUser } from '../types/index.js';
 import { recordAudit, diffValues } from '../utils/audit.js';
 import { notifyCourseStudents, formatManila, formatRoom } from '../utils/notify.js';
 import { deleteScoresOf } from '../utils/manualScoring.js';
+import { deleteMentionsOf } from '../utils/mentions.js';
 import { toPercent } from '../utils/gradeTerm.js';
 
 function currentUser(req: Request): AuthUser {
@@ -62,6 +63,17 @@ async function queryAssignments(user: AuthUser, filters: AssignmentFilters) {
            (SELECT COUNT(*) FROM submissions x WHERE x.assignment_id = a.id AND x.grade IS NOT NULL)::int AS graded_count,
            (SELECT COUNT(*) FROM manual_scores x WHERE x.item_type = 'assignment' AND x.item_id = a.id)::int AS scored_count,
            (SELECT COUNT(*) FROM enrollments en WHERE en.course_id = c.id)::int AS enrolled_count,
+           -- Open notes: a student's own that they have not seen yet; for the course's teacher, all unresolved.
+           (CASE
+              WHEN ${isStudent}::boolean THEN (
+                SELECT COUNT(*) FROM coursework_mentions cm
+                WHERE cm.item_type = 'assignment' AND cm.item_id = a.id AND cm.student_id = ${ownStudentId}::uuid
+                  AND cm.resolved_at IS NULL AND cm.acknowledged_at IS NULL)
+              WHEN (te.user_id = ${user.id} OR ${user.role === 'admin'}::boolean) THEN (
+                SELECT COUNT(*) FROM coursework_mentions cm
+                WHERE cm.item_type = 'assignment' AND cm.item_id = a.id AND cm.resolved_at IS NULL)
+              ELSE NULL
+            END)::int AS mention_count,
            ms.score::float8 AS manual_score, ms.feedback AS manual_feedback, ms.graded_at AS manual_graded_at,
            sub.id AS submission_id, sub.file_url AS submission_url,
            sub.file_name AS submission_file_name,
@@ -302,6 +314,7 @@ export async function deleteAssignment(req: Request, res: Response): Promise<voi
   // assignment go with it (online work keeps its grades, as it always has).
   await sql`DELETE FROM submissions WHERE assignment_id = ${id}`;
   if (before.delivery === 'in_person') await deleteScoresOf('assignment', [id]);
+  await deleteMentionsOf('assignment', [id]);
   try {
     const [assignment] = await sql`DELETE FROM assignments WHERE id = ${id} RETURNING id`;
     if (!assignment) throw httpError(404, 'Assignment not found');

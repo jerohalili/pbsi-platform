@@ -16,6 +16,7 @@ import { ExamFormDialog } from '@/components/exams/ExamFormDialog.tsx';
 import type { ExamItem } from '@/components/exams/types.ts';
 import { InPersonBadge, InPersonInfo, MyScoreCard } from '@/components/coursework/shared.tsx';
 import { ScoreSheet } from '@/components/coursework/ScoreSheet.tsx';
+import { MentionsPanel, MyMentions } from '@/components/coursework/mentions.tsx';
 
 export default function ExamDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -156,6 +157,8 @@ export default function ExamDetailPage() {
         details={exam.details}
       />
 
+      {isStudent && <MyMentions itemType="exam" itemId={exam.id} />}
+
       {isStudent && (
         <section className="space-y-4">
           <h2 className="text-xl font-bold">Your score</h2>
@@ -179,6 +182,16 @@ export default function ExamDetailPage() {
           </p>
           <ScoreSheet type="exam" itemId={exam.id} />
         </section>
+      )}
+
+      {canManage && (
+        <MentionsPanel
+          itemType="exam"
+          itemId={exam.id}
+          courseId={exam.course_id}
+          itemTitle={exam.title}
+          isPublished={exam.is_published}
+        />
       )}
 
       <ExamFormDialog

@@ -197,6 +197,27 @@ export const updateExamSchema = createExamSchema
   // A real boolean on purpose: z.coerce.boolean() would turn the string "false" into true.
   .extend({ is_published: z.boolean().optional() });
 
+// ---- Mentions: a teacher's note to specific students about an item ------------------------------
+
+export const MENTION_REASONS = ['comment', 'missed_deadline', 'correction'] as const;
+export const MENTION_ITEM_TYPES = ['assignment', 'quiz', 'exam'] as const;
+
+export const createMentionSchema = z.object({
+  item_type: z.enum(MENTION_ITEM_TYPES),
+  item_id: z.string().uuid('Invalid item ID'),
+  student_ids: z
+    .array(z.string().uuid('Invalid student ID'))
+    .min(1, 'Choose at least one student')
+    .max(100, 'Too many students in one note'),
+  reason: z.enum(MENTION_REASONS),
+  message: z.string().trim().min(1, 'Write a short note').max(1000, 'The note is too long (max 1000 characters)'),
+});
+
+export const updateMentionSchema = z.object({
+  // A real boolean on purpose: z.coerce.boolean() would turn the string "false" into true.
+  resolved: z.boolean(),
+});
+
 // ---- Manual scores (exams and in-person assignments / quizzes) --------------------------------------
 
 export const saveScoresSchema = z.object({
@@ -338,6 +359,7 @@ export const NOTIFICATION_TYPES = [
   'attendance',
   'discussion',
   'exam',
+  'mention',
 ] as const;
 
 // A link is an in-app path ("/grades") or a full web address; "" means no link.

@@ -26,5 +26,7 @@ export interface ExamItem {
   my_percent?: number | null;
   my_feedback: string | null;
   my_graded_at: string | null;
+  /** Notes from the teacher: a student's unseen ones; for the course's teacher, the unresolved ones. */
+  mention_count: number | null;
   status: ManualStatus | null;
 }

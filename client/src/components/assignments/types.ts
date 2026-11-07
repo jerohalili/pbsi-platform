@@ -41,6 +41,8 @@ export interface AssignmentItem {
   manual_percent?: number | null;
   manual_feedback: string | null;
   manual_graded_at: string | null;
+  /** Notes from the teacher: a student's unseen ones; for the course's teacher, the unresolved ones. */
+  mention_count: number | null;
   submission_id: string | null;
   submission_url: string | null;
   /** True when the student handed in an uploaded file instead of a link. */
