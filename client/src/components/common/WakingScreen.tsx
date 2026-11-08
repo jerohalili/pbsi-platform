@@ -1,5 +1,4 @@
 import { GraduationCap, WifiOff } from 'lucide-react';
-import { Button } from '@/components/ui/button.tsx';
 
 interface WakingScreenProps {
   /** "waking": the server is starting up. "offline": this device has no connection. */
@@ -11,12 +10,6 @@ interface WakingScreenProps {
   onRetry?: () => void;
 }
 
-/** After this long without an answer we say so, instead of letting people wonder. */
-const SLOW_START_SECONDS = 75;
-/** Before this the wait is too short to bother people with a counter or a button. */
-const SHOW_COUNTER_AFTER_SECONDS = 3;
-const SHOW_RETRY_AFTER_SECONDS = 10;
-
 const formatWait = (seconds: number): string =>
   seconds < 60 ? `${seconds} s` : `${Math.floor(seconds / 60)} min ${seconds % 60} s`;
 
@@ -25,7 +18,7 @@ const formatWait = (seconds: number): string =>
  * after a period of inactivity and it takes up to about a minute to start again. Used on the home
  * page while the app starts, and as an overlay on any page when the server stops answering.
  */
-export function WakingScreen({ variant = 'waking', overlay = false, elapsedSeconds, onRetry }: WakingScreenProps) {
+export function WakingScreen({ variant = 'waking', overlay = false, elapsedSeconds }: WakingScreenProps) {
   const offline = variant === 'offline';
   const seconds = elapsedSeconds ?? 0;
 
@@ -59,19 +52,9 @@ export function WakingScreen({ variant = 'waking', overlay = false, elapsedSecon
             : 'Our school management system was resting after a period of inactivity and is starting up again. This usually takes under a minute, and this page continues by itself.'}
         </p>
 
-        {!offline && seconds >= SLOW_START_SECONDS && (
-          <p className="text-site-muted text-sm">This is taking longer than usual. It should be ready soon.</p>
-        )}
-        {seconds >= SHOW_COUNTER_AFTER_SECONDS && (
-          <p className="text-site-muted text-xs" aria-hidden="true">
-            Waiting {formatWait(seconds)}
-          </p>
-        )}
-        {onRetry && seconds >= SHOW_RETRY_AFTER_SECONDS && (
-          <Button variant="outline" onClick={onRetry}>
-            Check again now
-          </Button>
-        )}
+        <p className="text-site-muted text-xs" aria-hidden="true">
+          Waiting {formatWait(seconds)}
+        </p>
       </div>
     </div>
   );

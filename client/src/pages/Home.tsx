@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import useAuth from '@/hooks/useAuth.ts';
 import { Button } from '@/components/ui/button.tsx';
@@ -36,6 +36,7 @@ export default function Home() {
   const forceLoading = searchParams.get('loading') === 'true';
   const { user, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   // Hooks must be called in the same order on every render, before any early returns.
   useEffect(() => {
@@ -43,7 +44,15 @@ export default function Home() {
       navigate('/dashboard');
     }
   }, [user, isAuthenticated, navigate]);
-  if (forceLoading || isLoading) return <WakingScreen />;
+
+  useEffect(() => {
+    const showing = forceLoading || isLoading;
+    if (!showing) return;
+    const id = setInterval(() => setElapsedSeconds((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [forceLoading, isLoading]);
+
+  if (forceLoading || isLoading) return <WakingScreen elapsedSeconds={elapsedSeconds} />;
 
   if (!isAuthenticated) {
     return (
