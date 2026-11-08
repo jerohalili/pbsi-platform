@@ -47,7 +47,13 @@ export async function getDashboardStats(req: Request, res: Response): Promise<vo
       my_courses AS (SELECT id FROM courses WHERE teacher_id = (SELECT id FROM t))
       SELECT
         (SELECT COUNT(*) FROM my_courses)::int AS my_courses,
-        (SELECT COUNT(*) FROM students st JOIN users su ON su.id = st.user_id WHERE su.is_active = TRUE)::int AS students,
+        -- Only the students enrolled in this teacher's courses (each counted once).
+        (SELECT COUNT(DISTINCT e.student_id)
+         FROM enrollments e
+         JOIN students st ON st.id = e.student_id
+         JOIN users su ON su.id = st.user_id
+         WHERE e.course_id IN (SELECT id FROM my_courses) AND su.is_active = TRUE
+        )::int AS students,
         (SELECT ROUND(
                   100.0 * COUNT(*) FILTER (WHERE status = 'present') /
                   NULLIF(COUNT(*) FILTER (WHERE status IN ('present','absent','late')), 0),
