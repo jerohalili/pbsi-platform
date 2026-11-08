@@ -243,6 +243,7 @@ export async function overrideGrade(req: Request, res: Response): Promise<void> 
     title: 'Grade adjusted',
     message: `${grade.assessment_title ?? 'Your grade'}: now ${score}%`,
     link: '/grades',
+    course_id: grade.course_id as string,
   });
 
   res.json({ grade: updated });

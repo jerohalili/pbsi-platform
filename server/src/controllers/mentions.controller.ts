@@ -63,8 +63,9 @@ export async function createMentions(req: Request, res: Response): Promise<void>
   try {
     const text = `${item.title} (${item.course_code}): ${input.message}`.slice(0, 1000);
     await sql`
-      INSERT INTO notifications (user_id, type, title, message, link)
-      SELECT st.user_id, 'mention', ${NOTIFICATION_TITLE[input.reason]}::text, ${text}::text, ${mentionLink(item.type, item.id)}::text
+      INSERT INTO notifications (user_id, type, title, message, link, course_id)
+      SELECT st.user_id, 'mention', ${NOTIFICATION_TITLE[input.reason]}::text, ${text}::text, ${mentionLink(item.type, item.id)}::text,
+             ${item.course_id}::uuid
       FROM students st
       WHERE st.id = ANY(${studentIds}::uuid[])
     `;

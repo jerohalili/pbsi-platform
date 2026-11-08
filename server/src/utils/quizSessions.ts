@@ -148,6 +148,7 @@ export async function autoSubmitExpired(filter: { quizId?: string; studentId?: s
           title: 'Quiz submitted automatically',
           message: `Time ran out on “${row.title as string}”, so your answers were submitted automatically. You scored ${attempt.score}%.`,
           link: `/quiz-results/${attempt.id}`,
+          course_id: row.course_id as string,
         });
       } catch (err) {
         console.error('[quiz-timer] could not submit an expired attempt:', err);

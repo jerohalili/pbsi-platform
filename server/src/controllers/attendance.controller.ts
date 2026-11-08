@@ -148,6 +148,7 @@ async function notifyAbsences(courseId: string, date: string, studentIds: string
         title: 'Marked absent',
         message: `You were marked absent in ${rows[0]?.code ?? 'a class'} on ${date}`,
         link: '/attendance',
+        course_id: courseId,
       },
     );
   } catch (err) {

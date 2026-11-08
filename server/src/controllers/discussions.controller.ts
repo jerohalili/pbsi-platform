@@ -91,8 +91,8 @@ async function displayName(userId: string): Promise<string> {
 }
 
 /** Best effort: a notification problem must never undo or block a post. */
-function notify(userIds: Iterable<string>, title: string, message: string, link: string): Promise<void> {
-  return notifyUsers(userIds, { type: 'discussion', title, message, link });
+function notify(userIds: Iterable<string>, courseId: string, title: string, message: string, link: string): Promise<void> {
+  return notifyUsers(userIds, { type: 'discussion', title, message, link, course_id: courseId });
 }
 
 function shorten(text: string, max = 80): string {
@@ -164,6 +164,7 @@ export async function createThread(req: Request, res: Response): Promise<void> {
     const name = await displayName(user.id);
     await notify(
       [teacher.user_id as string],
+      input.course_id,
       'New discussion',
       `${name} started “${shorten(input.title)}” in ${course.code}`,
       `/discussions/${thread.id}`,
@@ -320,7 +321,7 @@ export async function createReply(req: Request, res: Response): Promise<void> {
   recipients.delete(user.id);
   if (recipients.size > 0) {
     const name = await displayName(user.id);
-    await notify(recipients, 'New reply', `${name} replied in “${shorten(thread.title)}”`, `/discussions/${threadId}`);
+    await notify(recipients, thread.course_id, 'New reply', `${name} replied in “${shorten(thread.title)}”`, `/discussions/${threadId}`);
   }
 
   res.status(201).json({ reply });
@@ -375,7 +376,7 @@ export async function deleteReply(req: Request, res: Response): Promise<void> {
 async function fileReport(
   req: Request,
   res: Response,
-  target: { threadId: string; replyId: string | null; authorId: string; teacherUserId: string; threadTitle: string; courseCode: string },
+  target: { threadId: string; replyId: string | null; authorId: string; teacherUserId: string; threadTitle: string; courseCode: string; courseId: string },
 ): Promise<void> {
   const user = currentUser(req);
   const input = discussionReportSchema.parse(req.body);
@@ -398,6 +399,7 @@ async function fileReport(
   recipients.delete(target.authorId);
   await notify(
     recipients,
+    target.courseId,
     'Discussion post reported',
     `A post in “${shorten(target.threadTitle, 50)}” (${target.courseCode}) was reported: ${shorten(input.reason, 120)}`,
     `/discussions/${target.threadId}`,
@@ -421,6 +423,7 @@ export async function reportThread(req: Request, res: Response): Promise<void> {
     teacherUserId: thread.course_teacher_user_id,
     threadTitle: thread.title,
     courseCode: thread.course_code,
+    courseId: thread.course_id,
   });
 }
 
@@ -437,5 +440,6 @@ export async function reportReply(req: Request, res: Response): Promise<void> {
     teacherUserId: thread.course_teacher_user_id,
     threadTitle: thread.title,
     courseCode: thread.course_code,
+    courseId: thread.course_id,
   });
 }

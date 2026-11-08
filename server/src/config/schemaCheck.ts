@@ -128,3 +128,21 @@ export async function assertAnnouncementsSchema(): Promise<void> {
     );
   }
 }
+
+const NOTIFICATION_COURSE_SCRIPT = 'server/sql/notifications-course-id.sql';
+
+/** Stops the server at startup, with instructions, when notifications.course_id is missing. */
+export async function assertNotificationCourseSchema(): Promise<void> {
+  const [row] = await sql`
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = current_schema() AND table_name = 'notifications' AND column_name = 'course_id'
+    ) AS has_course_id
+  `;
+  if (!row?.has_course_id) {
+    throw new Error(
+      `The database is not ready for per-course notifications (missing column notifications.course_id). ` +
+        `Run ${NOTIFICATION_COURSE_SCRIPT} in the Neon SQL editor (safe to run more than once), then restart the server.`,
+    );
+  }
+}

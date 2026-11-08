@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   listNotifications,
   getUnreadCount,
+  getUnreadByCourse,
   markNotificationRead,
   markAllNotificationsRead,
   deleteNotification,
@@ -20,6 +21,7 @@ router.use(verifyToken);
 router.get('/', asyncHandler(listNotifications));
 // Fixed paths first, so "read-all" and "unread-count" are never read as an :id.
 router.get('/unread-count', asyncHandler(getUnreadCount));
+router.get('/unread-by-course', asyncHandler(getUnreadByCourse));
 router.patch('/read-all', asyncHandler(markAllNotificationsRead));
 router.patch('/:id/read', asyncHandler(markNotificationRead));
 router.delete('/:id', asyncHandler(deleteNotification));

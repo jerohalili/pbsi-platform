@@ -34,7 +34,7 @@ function currentUser(req: Request): AuthUser {
 async function notifyTeacherOfHandIn(studentUserId: string, assignmentId: string, isUpdate: boolean): Promise<void> {
   try {
     const [row] = await sql`
-      SELECT a.title, te.user_id AS teacher_user_id,
+      SELECT a.title, c.id AS course_id, te.user_id AS teacher_user_id,
              COALESCE(NULLIF(TRIM(CONCAT(p.first_name, ' ', p.last_name)), ''), 'A student') AS student_name
       FROM assignments a
       JOIN modules m ON m.id = a.module_id
@@ -49,6 +49,7 @@ async function notifyTeacherOfHandIn(studentUserId: string, assignmentId: string
       title: isUpdate ? 'Submission updated' : 'New submission',
       message: `${row.student_name} ${isUpdate ? 'updated their hand-in for' : 'submitted'} “${row.title}”`,
       link: `/assignments/${assignmentId}`,
+      course_id: row.course_id as string,
     });
   } catch (err) {
     console.error('[submissions] could not notify the teacher:', err);
@@ -378,6 +379,7 @@ export async function gradeSubmission(req: Request, res: Response): Promise<void
     title: 'Assignment graded',
     message: `${assignment.title}: ${input.score}/${assignment.max_score}`,
     link: `/assignments/${assignment.id}`,
+    course_id: assignment.course_id,
   });
 
   res.json({ submission });

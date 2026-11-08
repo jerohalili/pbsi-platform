@@ -1,6 +1,6 @@
 import app from './app.js';
 import { testConnection } from './config/db.js';
-import { assertAnnouncementsSchema, assertCourseworkSchema, assertMentionsSchema, assertQuizTimerSchema, assertUploadSchema } from './config/schemaCheck.js';
+import { assertAnnouncementsSchema, assertNotificationCourseSchema, assertCourseworkSchema, assertMentionsSchema, assertQuizTimerSchema, assertUploadSchema } from './config/schemaCheck.js';
 import { startQuizSweep } from './utils/quizSessions.js';
 
 const PORT = Number(process.env.PORT) || 4000;
@@ -13,6 +13,7 @@ async function start() {
     await assertCourseworkSchema();
     await assertMentionsSchema();
     await assertAnnouncementsSchema();
+    await assertNotificationCourseSchema();
     app.listen(PORT, () => {
       console.log(`[SERVER] Running on http://localhost:${PORT}`);
       console.log(`[SERVER] Environment: ${process.env.NODE_ENV ?? 'development'}`);

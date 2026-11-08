@@ -126,6 +126,7 @@ export async function createAnnouncement(req: Request, res: Response): Promise<v
     title: input.is_urgent ? `Urgent: ${input.title}` : input.title,
     message,
     link: '/dashboard',
+    course_id: input.audience === 'course' ? (input.course_id ?? null) : null,
   });
 
   res.status(201).json({ id: created.id, created_at: created.created_at, recipients: recipients.length });

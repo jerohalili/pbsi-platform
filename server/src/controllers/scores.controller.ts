@@ -180,8 +180,8 @@ export async function saveScores(req: Request, res: Response): Promise<void> {
         return `${item.title} (${item.course_code}): ${score}/${item.max_score} (${toPercent(score, item.max_score)}%)`;
       });
       await sql`
-        INSERT INTO notifications (user_id, type, title, message, link)
-        SELECT st.user_id, 'grade', 'Score posted', v.message, ${itemLink(item.type, item.id)}::text
+        INSERT INTO notifications (user_id, type, title, message, link, course_id)
+        SELECT st.user_id, 'grade', 'Score posted', v.message, ${itemLink(item.type, item.id)}::text, ${item.course_id}::uuid
         FROM unnest(${changedIds}::uuid[], ${messages}::text[]) AS v(student_id, message)
         JOIN students st ON st.id = v.student_id
       `;

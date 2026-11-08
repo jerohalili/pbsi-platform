@@ -72,6 +72,7 @@ export async function addEnrollments(req: Request, res: Response): Promise<void>
           title: 'Added to a course',
           message: `You were added to ${course?.code ?? 'a course'}${course?.name ? ` · ${course.name}` : ''}`,
           link: `/courses/${courseId}`,
+          course_id: courseId,
         },
       );
     } catch (err) {
@@ -113,7 +114,7 @@ export async function removeEnrollment(req: Request, res: Response): Promise<voi
         type: 'system',
         title: 'Removed from a course',
         message: `You were removed from ${row.code}. Your grades and past work are kept.`,
-        link: null,
+        link: null, // no course_id on purpose: they can no longer open the course, so it must not count there
       });
     }
   } catch (err) {

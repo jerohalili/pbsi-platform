@@ -6,6 +6,8 @@ export interface NotificationContent {
   message: string;
   /** An in-app path such as "/grades", or a full web address. */
   link?: string | null;
+  /** The course it is about, when it is about one: counted in the per-course unread numbers. */
+  course_id?: string | null;
 }
 
 /**
@@ -20,8 +22,9 @@ export async function notifyUsers(userIds: Iterable<string>, content: Notificati
 
   try {
     await sql`
-      INSERT INTO notifications (user_id, type, title, message, link)
-      SELECT r, ${content.type}::text, ${content.title}::text, ${content.message}::text, ${content.link || null}::text
+      INSERT INTO notifications (user_id, type, title, message, link, course_id)
+      SELECT r, ${content.type}::text, ${content.title}::text, ${content.message}::text, ${content.link || null}::text,
+             ${content.course_id ?? null}::uuid
       FROM unnest(${recipients}::uuid[]) AS r
     `;
   } catch (err) {
@@ -47,7 +50,7 @@ export async function courseStudentUserIds(courseId: string): Promise<string[]> 
  */
 export async function notifyCourseStudents(courseId: string, content: NotificationContent): Promise<void> {
   try {
-    await notifyUsers(await courseStudentUserIds(courseId), content);
+    await notifyUsers(await courseStudentUserIds(courseId), { ...content, course_id: content.course_id ?? courseId });
   } catch (err) {
     console.error(`[notify] could not look up students for \"${content.type}\" notification:`, err);
   }
