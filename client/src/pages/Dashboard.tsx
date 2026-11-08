@@ -16,6 +16,7 @@ import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import { DashboardAnnouncements } from '@/components/announcements/DashboardAnnouncements.tsx';
 import StudentDashboard from '@/components/dashboard/StudentDashboard.tsx';
+import TeacherDashboard from '@/components/dashboard/TeacherDashboard.tsx';
 
 type DashboardRole = 'admin' | 'teacher' | 'student';
 
@@ -131,6 +132,8 @@ export default function Dashboard() {
 
       {role === 'student' ? (
         <StudentDashboard announcements={<DashboardAnnouncements />} />
+      ) : role === 'teacher' ? (
+        <TeacherDashboard announcements={<DashboardAnnouncements />} />
       ) : (
         <DashboardAnnouncements />
       )}
