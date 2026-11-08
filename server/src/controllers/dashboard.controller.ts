@@ -39,7 +39,14 @@ export async function getDashboardStats(req: Request, res: Response): Promise<vo
          FROM attendance
          WHERE date::date = (NOW() AT TIME ZONE ${SCHOOL_TIMEZONE}::text)::date
         ) AS attendance_today,
-        (SELECT COUNT(*) FROM submissions WHERE grade IS NULL)::int AS ungraded_submissions
+        (SELECT COUNT(*)
+         FROM submissions s
+         JOIN assignments a ON a.id = s.assignment_id
+         JOIN modules m ON m.id = a.module_id
+         WHERE s.grade IS NULL AND a.delivery = 'online'
+           AND EXISTS (SELECT 1 FROM enrollments e JOIN students st ON st.id = e.student_id JOIN users su ON su.id = st.user_id
+                        WHERE e.course_id = m.course_id AND e.student_id = s.student_id AND su.is_active = TRUE)
+        )::int AS ungraded_submissions
     `;
   } else if (user.role === 'teacher') {
     statsQuery = sql`
@@ -67,7 +74,9 @@ export async function getDashboardStats(req: Request, res: Response): Promise<vo
          FROM submissions s
          JOIN assignments a ON a.id = s.assignment_id
          JOIN modules m ON m.id = a.module_id
-         WHERE s.grade IS NULL AND m.course_id IN (SELECT id FROM my_courses)
+         WHERE s.grade IS NULL AND a.delivery = 'online' AND m.course_id IN (SELECT id FROM my_courses)
+           AND EXISTS (SELECT 1 FROM enrollments e JOIN students st ON st.id = e.student_id JOIN users su ON su.id = st.user_id
+                        WHERE e.course_id = m.course_id AND e.student_id = s.student_id AND su.is_active = TRUE)
         )::int AS ungraded_submissions
     `;
   } else {
