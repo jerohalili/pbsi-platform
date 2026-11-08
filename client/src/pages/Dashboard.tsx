@@ -17,6 +17,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { DashboardAnnouncements } from '@/components/announcements/DashboardAnnouncements.tsx';
 import StudentDashboard from '@/components/dashboard/StudentDashboard.tsx';
 import TeacherDashboard from '@/components/dashboard/TeacherDashboard.tsx';
+import AdminDashboard from '@/components/dashboard/AdminDashboard.tsx';
 
 type DashboardRole = 'admin' | 'teacher' | 'student';
 
@@ -134,6 +135,8 @@ export default function Dashboard() {
         <StudentDashboard announcements={<DashboardAnnouncements />} />
       ) : role === 'teacher' ? (
         <TeacherDashboard announcements={<DashboardAnnouncements />} />
+      ) : role === 'admin' ? (
+        <AdminDashboard announcements={<DashboardAnnouncements />} />
       ) : (
         <DashboardAnnouncements />
       )}
