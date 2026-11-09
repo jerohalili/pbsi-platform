@@ -7,6 +7,7 @@ import {
   useLocation,
 } from 'react-router-dom';
 import useAuth from '@/hooks/useAuth.ts';
+import { ErrorBoundary } from '@/components/common/ErrorBoundary.tsx';
 import {
   AdminLayout,
   TeacherLayout,
@@ -49,9 +50,16 @@ const LayoutByRole: Record<Role, React.ComponentType<{ children: React.ReactNode
 
 function RoleLayout({ children }: { children?: React.ReactNode }) {
   const { user } = useAuth();
+  const location = useLocation();
   const Layout =
     user && LayoutByRole[user.role as Role] ? LayoutByRole[user.role as Role] : StudentLayout;
-  return <Layout>{children ?? <Outlet />}</Layout>;
+  // A page that crashes while drawing replaces only the page, never the sidebar and top bar;
+  // going to another page clears it.
+  return (
+    <Layout>
+      <ErrorBoundary resetKey={location.pathname}>{children ?? <Outlet />}</ErrorBoundary>
+    </Layout>
+  );
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
