@@ -2,6 +2,7 @@ import { matchPath } from 'react-router-dom';
 import type { PageTour, WalkthroughRole } from './types.ts';
 import { dashboardTour } from './dashboard.ts';
 import { courseDetailTour, coursesTour, moduleEditTour } from './courses.ts';
+import { attendanceTour, gradesTour, timetableTour } from './records.ts';
 import { assignmentDetailTour, courseworkTour, examDetailTour, quizDetailTour } from './coursework.ts';
 
 /** One entry per page that has its own walkthrough. Add new pages here. */
@@ -13,6 +14,9 @@ export const PAGE_TOURS: PageTour[] = [
   { key: 'assignment-detail', pattern: '/assignments/:id', build: assignmentDetailTour },
   { key: 'quiz-detail', pattern: '/quizzes/:id', build: quizDetailTour },
   { key: 'exam-detail', pattern: '/exams/:id', build: examDetailTour },
+  { key: 'grades', pattern: '/grades', build: gradesTour },
+  { key: 'attendance', pattern: '/attendance', build: attendanceTour },
+  { key: 'timetable', pattern: '/timetable', build: timetableTour },
   { key: 'module-edit', pattern: '/courses/:courseId/modules/:moduleId/edit', build: moduleEditTour, roles: ['admin', 'teacher'] },
 ];
 

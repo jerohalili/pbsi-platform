@@ -251,7 +251,7 @@ export default function GradesPage() {
     <div className="w-full bg-site-bg px-0 py-6 md:min-h-screen md:px-4 md:py-12">
       <div className="max-w-6xl mx-auto">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
-          <div>
+          <div data-tour="gr-header">
             <h1 className="text-2xl font-bold text-site-text">Grades</h1>
             <p className="text-site-muted">
               {user?.role === 'admin'
@@ -261,7 +261,7 @@ export default function GradesPage() {
                   : 'Your grades, course by course. Every assignment and quiz counts equally toward your average.'}
             </p>
           </div>
-          <Button variant="outline" onClick={exportCsv} disabled={rows.length === 0}>
+          <Button data-tour="gr-export" variant="outline" onClick={exportCsv} disabled={rows.length === 0}>
             <Download className="w-4 h-4 mr-2" /> Export CSV
           </Button>
         </div>
@@ -280,7 +280,7 @@ export default function GradesPage() {
         ) : (
           <>
             {/* Headline numbers */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+            <div data-tour="gr-stats" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
               <StatCard
                 icon={<GraduationCap className="w-4 h-4" />}
                 label={canManage ? 'Class average' : 'Average grade'}
@@ -341,7 +341,7 @@ export default function GradesPage() {
 
             {/* Per-course breakdown: click a card to filter the table below to that course. */}
             {summary.courses.length > 0 && (
-              <div className="mb-8">
+              <div data-tour="gr-courses" className="mb-8">
                 <h2 className="text-sm font-bold text-site-muted mb-3">By course</h2>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {summary.courses.map((c) => {
@@ -402,7 +402,7 @@ export default function GradesPage() {
             )}
 
             {/* Filters */}
-            <div className="flex flex-wrap items-center gap-3 mb-4">
+            <div data-tour="gr-filters" className="flex flex-wrap items-center gap-3 mb-4">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-site-muted pointer-events-none" />
                 <Input
@@ -466,7 +466,7 @@ export default function GradesPage() {
             </div>
 
             {/* Table */}
-            <div className="rounded-xl border border-site-border bg-site-card overflow-x-auto">
+            <div data-tour="gr-table" className="rounded-xl border border-site-border bg-site-card overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
                   <tr className="border-b border-site-border">
@@ -487,7 +487,7 @@ export default function GradesPage() {
                       </td>
                     </tr>
                   ) : (
-                    rows.map((g) => (
+                    rows.map((g, i) => (
                       <tr key={g.id} className="border-b border-site-border align-top">
                         {canManage && (
                           <td className="px-6 py-4 text-sm text-site-text">
@@ -521,6 +521,7 @@ export default function GradesPage() {
                         {canManage && (
                           <td className="px-6 py-4 text-right">
                             <Button
+                              data-tour={i === 0 ? 'gr-adjust' : undefined}
                               variant="outline"
                               size="sm"
                               onClick={() =>

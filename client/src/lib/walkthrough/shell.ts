@@ -7,6 +7,13 @@ export const sel = (name: string) => `[data-tour="${name}"]`;
 /** True when a marked element is on the page right now (some sections only appear when they have content). */
 export const present = (name: string): boolean => document.querySelector(sel(name)) !== null;
 
+export type TipSide = 'top' | 'bottom' | 'left' | 'right';
+
+/** One tour step: highlight a data-tour element and explain it. */
+export function tip(name: string, title: string, description: string, side: TipSide = 'bottom'): DriveStep {
+  return { element: sel(name), popover: { title, description, side, align: 'center' } };
+}
+
 export function navigationStep({ isMobile }: TourContext): DriveStep {
   return isMobile
     ? {

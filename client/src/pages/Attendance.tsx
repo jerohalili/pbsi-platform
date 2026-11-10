@@ -75,7 +75,7 @@ export default function AttendancePage() {
   return (
     <div className="w-full bg-site-bg px-0 py-6 md:min-h-screen md:px-4 md:py-12">
       <div className="max-w-5xl mx-auto">
-        <div className="mb-8">
+        <div data-tour="att-header" className="mb-8">
           <h1 className="text-2xl font-bold text-site-text">Attendance</h1>
           <p className="text-site-muted">
             {user?.role === 'admin'
@@ -88,7 +88,7 @@ export default function AttendancePage() {
 
         {!canTake && summary && (
           <>
-            <div className="grid gap-4 grid-cols-2 md:grid-cols-5 mb-2">
+            <div data-tour="att-summary" className="grid gap-4 grid-cols-2 md:grid-cols-5 mb-2">
               {[
                 { label: 'Present', value: summary.present_count, color: 'text-green-700' },
                 { label: 'Absent', value: summary.absent_count, color: 'text-red-700' },
@@ -114,7 +114,7 @@ export default function AttendancePage() {
         )}
 
         {canTake && (
-          <div className="flex gap-2 mb-6" role="tablist" aria-label="Attendance sections">
+          <div data-tour="att-tabs" className="flex gap-2 mb-6" role="tablist" aria-label="Attendance sections">
             {(
               [
                 { id: 'take', label: 'Take attendance' },

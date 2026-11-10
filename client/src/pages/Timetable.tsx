@@ -130,7 +130,7 @@ export default function TimetablePage() {
     <div className="w-full bg-site-bg px-0 py-6 md:min-h-screen md:px-4 md:py-12">
       <div className="max-w-6xl mx-auto">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-          <div>
+          <div data-tour="tt-header">
             <h1 className="text-2xl font-bold text-site-text">Weekly Timetable</h1>
             <p className="text-site-muted">
               {isTeacher
@@ -142,7 +142,7 @@ export default function TimetablePage() {
           </div>
           <div className="flex items-center gap-2">
             {isTeacher && (
-              <div className="flex gap-1" role="tablist" aria-label="Timetable scope">
+              <div data-tour="tt-scope" className="flex gap-1" role="tablist" aria-label="Timetable scope">
                 {(
                   [
                     { id: 'mine', label: 'My classes' },
@@ -168,7 +168,7 @@ export default function TimetablePage() {
               </div>
             )}
             {canAdd && (
-              <Button onClick={() => openCreate()}>
+              <Button data-tour="tt-add" onClick={() => openCreate()}>
                 <Plus className="w-4 h-4 mr-1" /> Add class
               </Button>
             )}
@@ -186,7 +186,7 @@ export default function TimetablePage() {
         )}
 
         {/* Phones: one card per day instead of the wide grid. */}
-        <div className="space-y-4 md:hidden">
+        <div data-tour="tt-days" className="space-y-4 md:hidden">
           {DAY_NAMES.map((dayName, dayIdx) => {
             const dayEntries = entries
               .filter((e) => e.day_of_week === dayIdx + 1)
@@ -263,7 +263,7 @@ export default function TimetablePage() {
           })}
         </div>
 
-        <div className="hidden rounded-xl border border-site-border bg-site-card overflow-x-auto md:block">
+        <div data-tour="tt-grid" className="hidden rounded-xl border border-site-border bg-site-card overflow-x-auto md:block">
           <div className="min-w-[980px]">
             <div className={cn(GRID_COLS, 'border-b border-site-border')}>
               <div className="px-3 py-4 font-bold text-site-text border-r border-site-border">Period</div>

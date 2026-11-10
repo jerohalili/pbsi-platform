@@ -70,7 +70,7 @@ export function AttendanceRecords({ courses, showStudent }: Props) {
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-3 mb-4">
+      <div data-tour="att-filters" className="flex flex-wrap items-center gap-3 mb-4">
         <select
           aria-label="Filter by course"
           value={courseId}
@@ -98,7 +98,7 @@ export function AttendanceRecords({ courses, showStudent }: Props) {
         )}
       </div>
 
-      <div className="rounded-xl border border-site-border bg-site-card overflow-x-auto">
+      <div data-tour="att-records" className="rounded-xl border border-site-border bg-site-card overflow-x-auto">
         <table className="w-full text-left">
           <thead>
             <tr className="border-b border-site-border">

@@ -174,7 +174,7 @@ export function TakeAttendance({ courses }: { courses: CourseOption[] }) {
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-3 mb-4">
+      <div data-tour="att-pick" className="flex flex-wrap items-center gap-3 mb-4">
         <select
           aria-label="Course"
           value={courseId}
@@ -210,7 +210,7 @@ export function TakeAttendance({ courses }: { courses: CourseOption[] }) {
         />
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 mb-4 text-sm" aria-live="polite">
+      <div data-tour="att-counts" className="flex flex-wrap items-center gap-2 mb-4 text-sm" aria-live="polite">
         {ATTENDANCE_STATUSES.map((s) => (
           <span key={s.value} className={cn('px-3 py-1 rounded-full font-medium', STATUS_BADGE[s.value])}>
             {s.label}: {counts[s.value]}
@@ -219,7 +219,7 @@ export function TakeAttendance({ courses }: { courses: CourseOption[] }) {
         <span className="px-3 py-1 rounded-full font-medium bg-site-card border border-site-border text-site-muted">
           Not marked: {counts.unmarked}
         </span>
-        <div className="ml-auto flex items-center gap-2">
+        <div data-tour="att-actions" className="ml-auto flex items-center gap-2">
           <Button variant="outline" onClick={markUnmarkedPresent} disabled={loading || counts.unmarked === 0}>
             Mark unmarked as present
           </Button>
@@ -251,7 +251,7 @@ export function TakeAttendance({ courses }: { courses: CourseOption[] }) {
                 </td>
               </tr>
             ) : (
-              visible.map((r) => (
+              visible.map((r, i) => (
                 <tr key={r.student_id} className="border-b border-site-border">
                   <td className="px-3 py-3 sm:px-6">
                     <div className="font-medium text-site-text">
@@ -261,6 +261,7 @@ export function TakeAttendance({ courses }: { courses: CourseOption[] }) {
                   </td>
                   <td className="px-3 py-3 sm:px-6">
                     <div
+                      data-tour={i === 0 ? 'att-status' : undefined}
                       role="group"
                       aria-label={`Attendance for ${r.first_name} ${r.last_name}`}
                       className="flex flex-wrap gap-1"
