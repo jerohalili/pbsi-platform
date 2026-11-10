@@ -149,7 +149,7 @@ export default function QuizDetailPage() {
       <div className="space-y-4">
         {back}
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-          <div className="space-y-2">
+          <div data-tour="cwd-info" className="space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
               <Badge variant="outline">{quiz.course_code}</Badge>
               {inPerson && <InPersonBadge />}
@@ -172,7 +172,7 @@ export default function QuizDetailPage() {
             )}
           </div>
           {canManage && (
-            <div className="flex gap-2 shrink-0 flex-wrap">
+            <div data-tour="cwd-actions" className="flex gap-2 shrink-0 flex-wrap">
               <Button
                 onClick={togglePublish}
                 disabled={publishing || (inPerson && quiz.is_published && (quiz.scored_count ?? 0) > 0)}
@@ -198,7 +198,7 @@ export default function QuizDetailPage() {
         </div>
         {publishError && <p className="text-sm text-destructive">{publishError}</p>}
         {canManage && !quiz.is_published && (
-          <p className="text-sm text-muted-foreground">
+          <p data-tour="cwd-draft" className="text-sm text-muted-foreground">
             This quiz is a draft. Students can’t see it, and won’t be notified, until you publish it.
           </p>
         )}
@@ -217,7 +217,7 @@ export default function QuizDetailPage() {
       {isStudent && <MyMentions itemType="quiz" itemId={quiz.id} />}
 
       {isStudent && inPerson && (
-        <section className="space-y-4">
+        <section data-tour="cwd-score" className="space-y-4">
           <h2 className="text-xl font-bold">Your score</h2>
           <MyScoreCard
             status={quiz.status}
@@ -231,7 +231,7 @@ export default function QuizDetailPage() {
       )}
 
       {canManage && inPerson && (
-        <section className="space-y-4">
+        <section data-tour="cwd-scores" className="space-y-4">
           <h2 className="text-xl font-bold">Scores</h2>
           <p className="text-sm text-muted-foreground">
             This quiz is taken face to face. Enter each student’s score afterwards; students see their own score and
@@ -242,7 +242,7 @@ export default function QuizDetailPage() {
       )}
 
       {isStudent && !inPerson && (
-        <Card className="p-6 space-y-4">
+        <Card data-tour="qd-attempt" className="p-6 space-y-4">
           {quiz.status === 'completed' && quiz.attempt_id ? (
             <>
               <p className="text-lg font-semibold">Your score: {quiz.my_score}%</p>
@@ -277,7 +277,7 @@ export default function QuizDetailPage() {
 
       {canManage && !inPerson && (
         <>
-          <section className="space-y-4">
+          <section data-tour="qd-questions" className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-bold">Questions</h2>
               <Button onClick={() => setQuestionDialog({ question: null })} disabled={locked}>
@@ -348,7 +348,7 @@ export default function QuizDetailPage() {
             )}
           </section>
 
-          <section className="space-y-4">
+          <section data-tour="qd-results" className="space-y-4">
             <h2 className="text-xl font-bold">Results</h2>
             {attemptsLoading ? (
               <Skeleton className="h-32 w-full" />

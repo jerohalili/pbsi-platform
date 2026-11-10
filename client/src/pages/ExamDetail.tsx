@@ -105,7 +105,7 @@ export default function ExamDetailPage() {
       <div className="space-y-4">
         {back}
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-          <div className="space-y-2">
+          <div data-tour="cwd-info" className="space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
               <Badge variant="outline">{exam.course_code}</Badge>
               <Badge variant="secondary">Exam</Badge>
@@ -118,7 +118,7 @@ export default function ExamDetailPage() {
             <p className="text-sm text-muted-foreground">{exam.course_name}</p>
           </div>
           {canManage && (
-            <div className="flex gap-2 shrink-0 flex-wrap">
+            <div data-tour="cwd-actions" className="flex gap-2 shrink-0 flex-wrap">
               <Button
                 onClick={togglePublish}
                 disabled={publishing || (exam.is_published && scored)}
@@ -142,7 +142,7 @@ export default function ExamDetailPage() {
         </div>
         {publishError && <p className="text-sm text-destructive">{publishError}</p>}
         {canManage && !exam.is_published && (
-          <p className="text-sm text-muted-foreground">
+          <p data-tour="cwd-draft" className="text-sm text-muted-foreground">
             This exam is a draft. Students can’t see it, and won’t be notified, until you publish it.
           </p>
         )}
@@ -160,7 +160,7 @@ export default function ExamDetailPage() {
       {isStudent && <MyMentions itemType="exam" itemId={exam.id} />}
 
       {isStudent && (
-        <section className="space-y-4">
+        <section data-tour="cwd-score" className="space-y-4">
           <h2 className="text-xl font-bold">Your score</h2>
           <MyScoreCard
             status={exam.status}
@@ -174,7 +174,7 @@ export default function ExamDetailPage() {
       )}
 
       {canManage && (
-        <section className="space-y-4">
+        <section data-tour="cwd-scores" className="space-y-4">
           <h2 className="text-xl font-bold">Scores</h2>
           <p className="text-sm text-muted-foreground">
             Enter each student’s score after checking their paper. Students see their own score and comment, and are

@@ -199,7 +199,7 @@ export default function AssignmentDetailPage() {
       <div className="space-y-4">
         {back}
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-          <div className="space-y-2">
+          <div data-tour="cwd-info" className="space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
               <Badge variant="outline">{assignment.course_code}</Badge>
               {inPerson && <InPersonBadge />}
@@ -237,7 +237,7 @@ export default function AssignmentDetailPage() {
             </div>
           </div>
           {canManage && (
-            <div className="flex gap-2 shrink-0 flex-wrap">
+            <div data-tour="cwd-actions" className="flex gap-2 shrink-0 flex-wrap">
               <Button
                 onClick={togglePublish}
                 disabled={publishing || (assignment.is_published && (assignment.submitted_count ?? 0) > 0)}
@@ -263,7 +263,7 @@ export default function AssignmentDetailPage() {
         </div>
         {publishError && <p className="text-sm text-destructive">{publishError}</p>}
         {canManage && !assignment.is_published && (
-          <p className="text-sm text-muted-foreground">
+          <p data-tour="cwd-draft" className="text-sm text-muted-foreground">
             This assignment is a draft. Students can’t see it, and won’t be notified, until you publish it.
           </p>
         )}
@@ -272,7 +272,7 @@ export default function AssignmentDetailPage() {
       {isStudent && <MyMentions itemType="assignment" itemId={assignment.id} />}
 
       {isStudent && inPerson && (
-        <section className="space-y-4">
+        <section data-tour="cwd-score" className="space-y-4">
           <h2 className="text-xl font-bold">Your score</h2>
           <MyScoreCard
             status={assignment.status}
@@ -286,7 +286,7 @@ export default function AssignmentDetailPage() {
       )}
 
       {canManage && inPerson && (
-        <section className="space-y-4">
+        <section data-tour="cwd-scores" className="space-y-4">
           <h2 className="text-xl font-bold">Scores</h2>
           <p className="text-sm text-muted-foreground">
             This assignment is checked face to face. Enter each student’s score afterwards; students see their own
@@ -297,7 +297,7 @@ export default function AssignmentDetailPage() {
       )}
 
       {isStudent && !inPerson && (
-        <section className="space-y-4">
+        <section data-tour="ad-work" className="space-y-4">
           <h2 className="text-xl font-bold">Your work</h2>
           <Card className="p-5 space-y-4">
             <div className="flex items-center gap-3 flex-wrap">
@@ -394,7 +394,7 @@ export default function AssignmentDetailPage() {
       )}
 
       {!isStudent && !inPerson && (
-        <section className="space-y-4">
+        <section data-tour="ad-submissions" className="space-y-4">
           <h2 className="text-xl font-bold">Submissions</h2>
           {!canManage ? (
             <Card className="p-6 text-sm text-muted-foreground">

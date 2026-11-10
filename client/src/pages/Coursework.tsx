@@ -298,7 +298,7 @@ export default function CourseworkPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+      <div data-tour="cw-header" className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Coursework</h1>
           <p className="text-sm text-muted-foreground">
@@ -307,7 +307,7 @@ export default function CourseworkPage() {
               : 'Assignments, quizzes and exams in one place. Some are done online; others are announced here and scored by hand.'}
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div data-tour="cw-filters" className="flex items-center gap-2 flex-wrap">
           <select
             className={selectClass}
             value={courseId}
@@ -334,14 +334,14 @@ export default function CourseworkPage() {
             ))}
           </select>
           {canCreate && (
-            <Button onClick={() => setCreating(true)}>
+            <Button data-tour="cw-new" onClick={() => setCreating(true)}>
               <Plus className="w-4 h-4 mr-2" /> New
             </Button>
           )}
         </div>
       </div>
 
-      <div className="flex gap-2 flex-wrap" role="group" aria-label="Kind of coursework">
+      <div data-tour="cw-tabs" className="flex gap-2 flex-wrap" role="group" aria-label="Kind of coursework">
         {TABS.map((t) => (
           <Button
             key={t.value}
@@ -369,7 +369,7 @@ export default function CourseworkPage() {
           </Button>
         </Card>
       ) : rows.length === 0 ? (
-        <Card className="p-8 text-center text-muted-foreground">
+        <Card data-tour="cw-empty" className="p-8 text-center text-muted-foreground">
           {allRows.length === 0 ? (
             <>
               <p>Nothing here yet.</p>
@@ -384,7 +384,7 @@ export default function CourseworkPage() {
           )}
         </Card>
       ) : (
-        <div className="rounded-xl border border-input bg-card overflow-x-auto">
+        <div data-tour="cw-table" className="rounded-xl border border-input bg-card overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
