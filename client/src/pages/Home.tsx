@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import useAuth from '@/hooks/useAuth.ts';
 import { Button } from '@/components/ui/button.tsx';
@@ -38,6 +38,16 @@ export default function Home() {
   const navigate = useNavigate();
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
+  // When the loading screen first started showing. Kept in a ref (and persisted in sessionStorage
+  // across reloads) so the wait counter never jumps back to zero when the interval effect
+  // restarts, the component re-renders (StrictMode remount), or the page is reloaded while the
+  // server is still waking up.
+  const loadingStartedRef = useRef<number | null>(null);
+
+  // True once the initial auth check has finished, so we never draw a blank page for a split
+  // second while deciding between the waking screen, the landing page, and the dashboard.
+  const [authSettled, setAuthSettled] = useState(false);
+
   // Hooks must be called in the same order on every render, before any early returns.
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -45,12 +55,37 @@ export default function Home() {
     }
   }, [user, isAuthenticated, navigate]);
 
+  // Start / stop the wait timer based on whether the loading screen is showing.
   useEffect(() => {
     const showing = forceLoading || isLoading;
-    if (!showing) return;
-    const id = setInterval(() => setElapsedSeconds((s) => s + 1), 1000);
-    return () => clearInterval(id);
+    if (showing) {
+      if (loadingStartedRef.current === null) {
+        const persisted = sessionStorage.getItem('pbsi:homeLoadingStarted');
+        const parsed = persisted ? Number(persisted) : NaN;
+        loadingStartedRef.current = Number.isFinite(parsed) ? parsed : Date.now();
+        sessionStorage.setItem('pbsi:homeLoadingStarted', String(loadingStartedRef.current));
+      }
+      const tick = () => {
+        if (loadingStartedRef.current) {
+          setElapsedSeconds(Math.max(0, Math.floor((Date.now() - loadingStartedRef.current) / 1000)));
+        }
+      };
+      tick();
+      const id = setInterval(tick, 1000);
+      return () => clearInterval(id);
+    }
+    setAuthSettled(true);
+    loadingStartedRef.current = null;
+    sessionStorage.removeItem('pbsi:homeLoadingStarted');
   }, [forceLoading, isLoading]);
+
+  // If auth finished without ever showing the loading screen, mark it settled.
+  useEffect(() => {
+    if (!isLoading) setAuthSettled(true);
+  }, [isLoading]);
+
+  // While auth is still being resolved, show the waking screen instead of a blank page.
+  if (!authSettled) return <WakingScreen elapsedSeconds={elapsedSeconds} />;
 
   if (forceLoading || isLoading) return <WakingScreen elapsedSeconds={elapsedSeconds} />;
 
