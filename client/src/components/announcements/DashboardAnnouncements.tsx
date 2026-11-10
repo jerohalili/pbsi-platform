@@ -21,7 +21,7 @@ export function DashboardAnnouncements() {
   const shown = sorted.slice(0, SHOWN);
 
   return (
-    <Card className="p-6">
+    <Card data-tour="dash-announcements" className="p-6">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="flex items-center gap-2 font-bold text-site-text">
           <Megaphone className="h-4 w-4" aria-hidden="true" /> Announcements

@@ -16,4 +16,6 @@ export interface PageTour {
   /** react-router path pattern, e.g. '/courses/:id'. */
   pattern: string;
   build: TourBuilder;
+  /** Roles that can use this page. When set, other roles get the general tour and no prompt. */
+  roles?: WalkthroughRole[];
 }

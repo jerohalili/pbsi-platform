@@ -63,6 +63,7 @@ export default function AdminDashboard({ announcements }: { announcements: React
       {/* Alerts: real set-up problems. Shown first, and only when there is something to fix. */}
       <Section
         title="Needs attention"
+        tour="dash-alerts"
         icon={<TriangleAlert className={icon} aria-hidden="true" />}
         loading={loading}
         failed={failed('alerts')}
@@ -95,6 +96,7 @@ export default function AdminDashboard({ announcements }: { announcements: React
         {/* The school at a glance + the last 7 days */}
         <Section
           title="The school at a glance"
+          tour="dash-glance"
           icon={<Users className={icon} aria-hidden="true" />}
           loading={loading}
           failed={failed('metrics')}
@@ -141,6 +143,7 @@ export default function AdminDashboard({ announcements }: { announcements: React
         {/* School year */}
         <Section
           title={year ? `School year ${year.start_year}–${year.end_year}` : 'School year'}
+          tour="dash-year"
           icon={<GraduationCap className={icon} aria-hidden="true" />}
           loading={loading}
           failed={failed('school_year')}
@@ -167,6 +170,7 @@ export default function AdminDashboard({ announcements }: { announcements: React
       {/* Recent changes */}
       <Section
         title="Recent changes"
+        tour="dash-changes"
         icon={<History className={icon} aria-hidden="true" />}
         loading={loading}
         failed={failed('audit_stream')}

@@ -444,7 +444,7 @@ export function ModuleContentManager({ moduleId }: { moduleId: string }) {
                       </Button>
                     </div>
                   ) : (
-                    <div className="flex shrink-0 items-center">
+                    <div data-tour={index === 0 ? 'me-block-actions' : undefined} className="flex shrink-0 items-center">
                       <button
                         type="button"
                         aria-label="Move up"
@@ -510,7 +510,7 @@ export function ModuleContentManager({ moduleId }: { moduleId: string }) {
       )}
 
       {/* Add a block */}
-      <div className="rounded-xl border border-input bg-muted/30">
+      <div data-tour="me-add-block" className="rounded-xl border border-input bg-muted/30">
         <div className="p-3">
           <p className="mb-2 text-sm font-medium">Add a block</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">

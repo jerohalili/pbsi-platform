@@ -110,6 +110,7 @@ export default function TeacherDashboard({ announcements }: { announcements: Rea
         {/* Pending scores */}
         <Section
           title="Pending scores"
+          tour="dash-pending"
           icon={<PenLine className={icon} aria-hidden="true" />}
           loading={loading}
           failed={failed('pending_scores')}
@@ -147,6 +148,7 @@ export default function TeacherDashboard({ announcements }: { announcements: Rea
         {/* Today */}
         <Section
           title="Today"
+          tour="dash-today"
           icon={<CalendarDays className={icon} aria-hidden="true" />}
           loading={loading}
           failed={failed('today')}
@@ -183,6 +185,7 @@ export default function TeacherDashboard({ announcements }: { announcements: Rea
         {/* Open notes to students */}
         <Section
           title="Open notes"
+          tour="dash-notes"
           icon={<StickyNote className={icon} aria-hidden="true" />}
           loading={loading}
           failed={failed('open_mentions')}
@@ -217,6 +220,7 @@ export default function TeacherDashboard({ announcements }: { announcements: Rea
         {/* Drafts */}
         <Section
           title="Drafts to publish"
+          tour="dash-drafts"
           icon={<FileEdit className={icon} aria-hidden="true" />}
           loading={loading}
           failed={failed('drafts')}
@@ -251,6 +255,7 @@ export default function TeacherDashboard({ announcements }: { announcements: Rea
       {/* Courses */}
       <Section
         title="My courses"
+        tour="dash-courses"
         icon={<BookOpen className={icon} aria-hidden="true" />}
         loading={loading}
         failed={failed('courses')}
@@ -284,6 +289,7 @@ export default function TeacherDashboard({ announcements }: { announcements: Rea
       {/* What students did lately */}
       <Section
         title="Student activity"
+        tour="dash-student-activity"
         icon={<Activity className={icon} aria-hidden="true" />}
         loading={loading}
         failed={failed('recent_activity')}

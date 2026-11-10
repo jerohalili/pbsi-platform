@@ -76,7 +76,7 @@ export function CourseStudentsSection({ courseId, courseCode }: CourseStudentsSe
   };
 
   return (
-    <section className="space-y-4">
+    <section data-tour="cd-students" className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h2 className="text-xl font-bold">Students{data ? ` (${enrolled.length})` : ''}</h2>

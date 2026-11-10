@@ -4,6 +4,9 @@ import type { TourContext } from './types.ts';
 /** Steps for the parts of the screen every page shares. All use data-tour attributes. */
 export const sel = (name: string) => `[data-tour="${name}"]`;
 
+/** True when a marked element is on the page right now (some sections only appear when they have content). */
+export const present = (name: string): boolean => document.querySelector(sel(name)) !== null;
+
 export function navigationStep({ isMobile }: TourContext): DriveStep {
   return isMobile
     ? {

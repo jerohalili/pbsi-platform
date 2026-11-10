@@ -43,7 +43,7 @@ export default function CoursesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div data-tour="courses-header" className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Courses</h1>
           <p className="text-muted-foreground">
@@ -51,7 +51,7 @@ export default function CoursesPage() {
           </p>
         </div>
         {canCreate && (
-          <Button onClick={() => setCreating(true)}>
+          <Button data-tour="courses-new" onClick={() => setCreating(true)}>
             <Plus className="w-4 h-4 mr-2" /> New Course
           </Button>
         )}
@@ -71,7 +71,7 @@ export default function CoursesPage() {
           </Button>
         </Card>
       ) : courses.length === 0 ? (
-        <Card className="p-10 text-center text-muted-foreground">
+        <Card data-tour="courses-empty" className="p-10 text-center text-muted-foreground">
           <BookOpen className="w-8 h-8 mx-auto mb-3 opacity-60" />
           <p>{canCreate ? 'No courses yet.' : 'You’re not enrolled in any courses yet.'}</p>
           {canCreate ? (
@@ -82,8 +82,8 @@ export default function CoursesPage() {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {courses.map((c) => (
-            <Link key={c.id} to={`/courses/${c.id}`} className="block focus:outline-none focus:ring-2 focus:ring-ring rounded-xl">
+          {courses.map((c, i) => (
+            <Link key={c.id} to={`/courses/${c.id}`} data-tour={i === 0 ? 'courses-card' : undefined} className="block focus:outline-none focus:ring-2 focus:ring-ring rounded-xl">
               <Card className="p-5 h-full hover:border-primary/40 transition-colors">
                 <div className="flex items-center justify-between gap-2 mb-3">
                   <Badge variant="outline">{c.code}</Badge>

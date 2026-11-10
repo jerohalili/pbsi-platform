@@ -21,9 +21,9 @@ export function useWalkthrough(): WalkthroughApi {
   const { pathname } = useLocation();
   const driverRef = useRef<Driver | null>(null);
 
-  const pageTour = useMemo(() => findPageTour(pathname), [pathname]);
   const hidden = isWalkthroughHidden(pathname);
   const role = ROLES.includes(user?.role as WalkthroughRole) ? (user?.role as WalkthroughRole) : 'student';
+  const pageTour = useMemo(() => findPageTour(pathname, role), [pathname, role]);
 
   // Leaving the page ends its tour, so highlights never point at elements that are gone.
   useEffect(() => {
@@ -39,7 +39,9 @@ export function useWalkthrough(): WalkthroughApi {
       role,
       isMobile: !window.matchMedia('(min-width: 768px)').matches,
     };
-    const steps = pageTour ? pageTour.build(ctx) : portalSteps(ctx);
+    // A page tour that finds nothing to show falls back to the general tour instead of an empty one.
+    const built = pageTour ? pageTour.build(ctx) : [];
+    const steps = built.length > 0 ? built : portalSteps(ctx);
     const tour = driver({
       steps,
       showProgress: true,

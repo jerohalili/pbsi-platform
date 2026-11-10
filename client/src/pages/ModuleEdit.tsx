@@ -132,7 +132,7 @@ export default function ModuleEditPage() {
 
   return (
     <div className="space-y-8">
-      <div className="space-y-2">
+      <div data-tour="me-header" className="space-y-2">
         {back}
         <h1 className="text-2xl font-bold">Edit module</h1>
         <p className="text-sm text-muted-foreground">
@@ -141,7 +141,7 @@ export default function ModuleEditPage() {
         </p>
       </div>
 
-      <Card className="p-5">
+      <Card data-tour="me-details" className="p-5">
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="me-title">Title</Label>
@@ -165,7 +165,7 @@ export default function ModuleEditPage() {
         </form>
       </Card>
 
-      <Card className="p-5">
+      <Card data-tour="me-blocks" className="p-5">
         <ModuleContentManager moduleId={module.id} />
       </Card>
     </div>

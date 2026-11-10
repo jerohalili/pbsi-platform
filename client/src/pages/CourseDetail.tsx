@@ -294,7 +294,7 @@ export default function CourseDetailPage() {
       <div className="space-y-4">
         {back}
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-          <div className="space-y-2">
+          <div data-tour="cd-header" className="space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
               <Badge variant="outline">{course.code}</Badge>
               {course.is_mine && <Badge variant="success">Your course</Badge>}
@@ -306,13 +306,13 @@ export default function CourseDetailPage() {
             {course.description && <p className="text-sm max-w-2xl whitespace-pre-wrap">{course.description}</p>}
           </div>
           <div className="flex gap-2 shrink-0">
-            <Button variant="outline" asChild>
+            <Button variant="outline" asChild data-tour="cd-discussions">
               <Link to={`/discussions?course=${course.id}`}>
                 <MessageCircle className="w-4 h-4 mr-2" /> Discussions
               </Link>
             </Button>
             {canEdit && (
-              <Button onClick={() => setEditingCourse(true)}>
+              <Button data-tour="cd-edit" onClick={() => setEditingCourse(true)}>
                 <Pencil className="w-4 h-4 mr-2" /> Edit course
               </Button>
             )}
@@ -325,7 +325,7 @@ export default function CourseDetailPage() {
         </div>
       </div>
 
-      <section className="space-y-4">
+      <section data-tour="cd-modules" className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold">Modules</h2>
           <div className="flex items-center gap-2">
@@ -340,7 +340,7 @@ export default function CourseDetailPage() {
               </Button>
             )}
             {canEdit && (
-              <Button onClick={() => setCreatingModule(true)}>
+              <Button data-tour="cd-add-module" onClick={() => setCreatingModule(true)}>
                 <Plus className="w-4 h-4 mr-2" /> Add module
               </Button>
             )}
@@ -425,7 +425,7 @@ export default function CourseDetailPage() {
         )}
       </section>
 
-      <section className="space-y-4">
+      <section data-tour="cd-quizzes" className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold">Quizzes</h2>
           {canEdit && (
@@ -518,7 +518,7 @@ export default function CourseDetailPage() {
         )}
       </section>
 
-      <section className="space-y-4">
+      <section data-tour="cd-exams" className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold">Exams</h2>
           {canEdit && (
@@ -574,7 +574,7 @@ export default function CourseDetailPage() {
         )}
       </section>
 
-      <section className="space-y-4">
+      <section data-tour="cd-assignments" className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold">Assignments</h2>
           {canEdit && (

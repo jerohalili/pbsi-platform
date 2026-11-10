@@ -22,6 +22,7 @@ export function Section({
   emptyIcon,
   emptyText,
   action,
+  tour,
   children,
 }: {
   title: string;
@@ -33,10 +34,12 @@ export function Section({
   emptyIcon: React.ReactNode;
   emptyText: string;
   action?: React.ReactNode;
+  /** Marks the section for the page walkthrough (data-tour). */
+  tour?: string;
   children: React.ReactNode;
 }) {
   return (
-    <Card className="p-6">
+    <Card data-tour={tour} className="p-6">
       <div className="mb-4 flex items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 font-bold text-site-text">
           {sectionIcon} {title}

@@ -104,7 +104,7 @@ export default function StudentDashboard({ announcements }: { announcements: Rea
           </Button>
         </Card>
       ) : data?.attention && data.attention.count > 0 ? (
-        <Card className="border-amber-300 bg-amber-50/60 p-6 dark:border-amber-700 dark:bg-amber-950/30">
+        <Card data-tour="dash-attention" className="border-amber-300 bg-amber-50/60 p-6 dark:border-amber-700 dark:bg-amber-950/30">
           <h2 className="mb-3 flex items-center gap-2 font-bold text-site-text">
             <TriangleAlert className={icon} aria-hidden="true" /> Needs your attention ({data.attention.count})
           </h2>
@@ -135,6 +135,7 @@ export default function StudentDashboard({ announcements }: { announcements: Rea
         {/* Today */}
         <Section
           title="Today"
+          tour="dash-today"
           icon={<CalendarDays className={icon} aria-hidden="true" />}
           loading={loading}
           failed={failed('today')}
@@ -169,6 +170,7 @@ export default function StudentDashboard({ announcements }: { announcements: Rea
         {/* To-do */}
         <Section
           title="To-do"
+          tour="dash-todo"
           icon={<ListChecks className={icon} aria-hidden="true" />}
           loading={loading}
           failed={failed('todo')}
@@ -218,6 +220,7 @@ export default function StudentDashboard({ announcements }: { announcements: Rea
       {/* Courses */}
       <Section
         title="My courses"
+        tour="dash-courses"
         icon={<BookOpen className={icon} aria-hidden="true" />}
         loading={loading}
         failed={failed('courses')}
@@ -250,6 +253,7 @@ export default function StudentDashboard({ announcements }: { announcements: Rea
         {/* Recent grades */}
         <Section
           title="Recent grades"
+          tour="dash-grades"
           icon={<Award className={icon} aria-hidden="true" />}
           loading={loading}
           failed={failed('recent_grades')}
@@ -284,6 +288,7 @@ export default function StudentDashboard({ announcements }: { announcements: Rea
         {/* Discussion highlights */}
         <Section
           title="Discussion highlights"
+          tour="dash-discussions"
           icon={<MessageSquare className={icon} aria-hidden="true" />}
           loading={loading}
           failed={failed('discussion_highlights')}
