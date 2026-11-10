@@ -90,7 +90,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div data-tour="dash-header" className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-site-text">Dashboard</h1>
           <p className="text-site-muted">
@@ -101,14 +101,14 @@ export default function Dashboard() {
 
       {/* Stat cards */}
       {isError ? (
-        <Card className="p-6 flex items-center justify-between gap-4">
+        <Card data-tour="dash-stats" className="p-6 flex items-center justify-between gap-4">
           <p className="text-sm text-site-muted">Couldn't load dashboard data.</p>
           <Button variant="outline" size="sm" onClick={() => refetch()}>
             Retry
           </Button>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div data-tour="dash-stats" className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {statCards.map((card) => (
             <Card key={card.key} className="p-6">
               <div className="flex items-center justify-between">
@@ -142,7 +142,7 @@ export default function Dashboard() {
       )}
 
       {/* Recent activity */}
-      <Card className="p-6">
+      <Card data-tour="dash-activity" className="p-6">
         <div className="flex items-center justify-between mb-6">
           <h2 className="font-bold text-site-text">Recent Activity</h2>
           <button

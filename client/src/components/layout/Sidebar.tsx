@@ -4,6 +4,7 @@ import useAuth from '@/hooks/useAuth.ts';
 import useUnreadNotifications from '@/hooks/useUnreadNotifications.ts';
 import { UserAvatar } from '@/components/common/UserAvatar.tsx';
 import { AnnouncementBanner } from '@/components/announcements/AnnouncementBanner.tsx';
+import WalkthroughButton from '@/components/walkthrough/WalkthroughButton.tsx';
 import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet.tsx';
 import {
   LayoutDashboard,
@@ -127,13 +128,14 @@ export function Sidebar() {
         )}
       </div>
 
-      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+      <nav data-tour="sidebar-nav" className="flex-1 p-3 space-y-1 overflow-y-auto">
         {items.map((item) => {
           const isActive = isActiveItem(item, location.pathname);
           const badge = item.href === '/notifications' ? unread : 0;
           return (
             <button
               key={item.href}
+              data-tour={`nav-${item.href.slice(1)}`}
               onClick={() => navigate(item.href)}
               aria-label={badge > 0 ? `${item.label}, ${badge} unread` : item.label}
               className={`relative flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
@@ -162,7 +164,7 @@ export function Sidebar() {
       </nav>
 
       <div className="p-3 border-t border-input">
-        <div className="flex items-center gap-3 p-2">
+        <div data-tour="sidebar-profile" className="flex items-center gap-3 p-2">
           <AvatarBadge />
           {!collapsed && (
             <div className="flex flex-col min-w-0">
@@ -200,6 +202,9 @@ export function TopNav() {
           <span className="hidden sm:block text-sm text-muted-foreground">
             {(user?.role ?? '').charAt(0).toUpperCase() + (user?.role ?? '').slice(1)} Portal
           </span>
+        </div>
+        <div className="flex items-center gap-1">
+          <WalkthroughButton />
         </div>
       </header>
       <AnnouncementBanner />
@@ -242,6 +247,7 @@ export function MobileNav() {
       <SheetTrigger asChild>
         <button
           type="button"
+          data-tour="mobile-menu"
           aria-label={unread > 0 ? `Open menu, ${unread} unread notifications` : 'Open menu'}
           className="relative -ml-2 flex h-11 w-11 items-center justify-center rounded-md hover:bg-accent md:hidden"
         >
