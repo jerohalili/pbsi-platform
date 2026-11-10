@@ -1,12 +1,14 @@
 import app from './app.js';
 import { testConnection } from './config/db.js';
 import { assertAnnouncementsSchema, assertNotificationCourseSchema, assertCourseworkSchema, assertMentionsSchema, assertQuizTimerSchema, assertUploadSchema } from './config/schemaCheck.js';
+import { assertServerEnv } from './config/env.js';
 import { startQuizSweep } from './utils/quizSessions.js';
 
 const PORT = Number(process.env.PORT) || 4000;
 
 async function start() {
   try {
+    assertServerEnv();
     await testConnection();
     await assertUploadSchema();
     await assertQuizTimerSchema();

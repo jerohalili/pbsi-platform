@@ -1,6 +1,6 @@
 # PBSI Platform
 
-A zero-cost school management system built with the PERN stack (PostgreSQL, Express, React, Node). Administrators, teachers and students each get their own role-based dashboard for courses, modules, assignments, auto-graded quizzes, grades, attendance, timetables, discussions and notifications.
+A zero-cost school management system built with the PERN stack (PostgreSQL, Express, React, Node). Administrators, teachers and students each get their own role-based dashboard for courses, modules, assignments, auto-graded quizzes, grades, attendance, timetables, discussions, announcements and notifications.
 
 Live app: [https://pbsi-platform.vercel.app](https://pbsi-platform.vercel.app)
 
@@ -10,9 +10,9 @@ There are three roles. Accounts are created by staff; public sign-up is disabled
 
 | Role        | What they can do                                                                                                                                                                                                                                        |
 |-------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **admin**   | Everything: manage all users, courses, grades, attendance, timetable and audit logs; export students to CSV                                                                                                                                             |
-| **teacher** | Manage their own courses, modules, assignments, quizzes and timetable entries; choose which students are enrolled in their courses; grade submissions; take attendance; view and adjust grades for the courses they teach; create student accounts and delete the students they added (only while the student has no records) |
-| **student** | View the courses they are enrolled in, their own grades and attendance; submit assignments; take published quizzes; join discussions                                                                                                                                             |
+| **admin**   | Everything: manage all users, courses, grades, attendance, timetable and audit logs; post announcements to anyone; export students to CSV                                                                                                                  |
+| **teacher** | Manage their own courses, modules, assignments, quizzes and timetable entries; choose which students are enrolled in their courses; grade submissions; take attendance; view and adjust grades for the courses they teach; post announcements to the students of their courses; create student accounts and delete the students they added (only while the student has no records) |
+| **student** | View the courses they are enrolled in, their own grades and attendance; submit assignments; take published quizzes; join discussions; read announcements addressed to them                                                                                                       |
 
 ## Features
 
@@ -31,9 +31,14 @@ There are three roles. Accounts are created by staff; public sign-up is disabled
 - **Attendance**: teachers and admins load a class roster for a course and date and save it in bulk or one student at a time. There is one record per student, course and day; saving again updates it. Changing an already-recorded status is treated as a correction and audited (`attendance.override`). Students see their own records and a summary.
 - **Timetable**: weekly schedule, Monday to Saturday, by period. The API refuses an entry that would double-book a teacher, a room or a course (409 with a message saying what clashes).
 - **Discussions**: each course has its own board. Everyone signed in can start a discussion (title and opening post), reply (optionally to a specific reply), edit or delete their own posts and report a post. The course's teacher and admins can pin, lock, mark the answer and delete any post; a deleted reply stays as a short placeholder so the conversation still reads well. Posts are plain text. Replies notify the asker, the person answered and the course teacher; reports notify the course teacher and admins (never the writer, and without naming the reporter) and are audited. Creating threads, replies and reports is limited to 30 per 10 minutes per user.
-- **Notifications**: in-app alerts, with an unread badge in the sidebar and on the phone menu button (refreshed every minute). People are told about: a newly published assignment or quiz (the active students enrolled in that course), being added to or removed from a course, being marked absent, a grade or an adjusted grade, discussion replies and reports, and (teachers) a student's new or updated hand-in. Staff can also send a message (`POST /notifications`; teachers only to students). The page filters unread, marks one or all as read, removes and pages through older ones.
-- **Audit logs** (admin only, read-only through the API) for role changes, deactivations, password resets, deletions, grade overrides, submission grading, attendance corrections, staff-sent notifications, and creating, changing or deleting courses, assignments and quizzes. Entries record who, what, which record, the before/after values and the IP address. Grade overrides are saved in the same transaction as their audit entry; the rest are best-effort. The page filters by action, record type and date, and shows what changed.
-- **Dashboards** with role-specific stats.
+- **Announcements** (`/announcements` for admins and teachers; everyone reads them on their dashboard): a message to everyone, all teachers, all students or the students (and teacher) of one course. An admin can post to any audience; a teacher only to the students of a course they teach. Each announcement can have an expiry, after which it leaves the dashboards and banners but stays in the author's and admins' history, and can be marked **urgent**: it then shows as a red banner under the top bar on every page until it expires. Posting sends one notification (type `announcement`) per active recipient, never to the author. Editing changes the text without notifying again, and deleting is soft (`deleted_at`), so the audit trail stays complete. Posting is limited to 10 per hour per person and audited (`announcement.create`, `announcement.update`, `announcement.delete`). Stored in `announcements`.
+- **Notifications**: in-app alerts, with an unread badge in the sidebar and on the phone menu button (refreshed every minute). People are told about: a newly published assignment or quiz (the active students enrolled in that course), being added to or removed from a course, being marked absent, a grade or an adjusted grade, discussion replies and reports, and (teachers) a student's new or updated hand-in. Announcements are delivered the same way. Notifications about one course carry its id (`notifications.course_id`), which is how the dashboards show the unread count on each course card (`GET /notifications/unread-by-course`); older notifications were matched to their course from their link when it pointed at an assignment, quiz, exam, discussion or course, and the rest have no course. Staff can also send a message (`POST /notifications`; teachers only to students). The page filters unread, marks one or all as read, removes and pages through older ones.
+- **Audit logs** (admin only, read-only through the API) for sign-ins (`login`; a wrong password on an existing account, `login_failed`, at most one entry per account per 5 minutes; a right password on a deactivated account, `login_blocked_inactive`; an unknown email is never recorded, so nobody can fill the table with made-up addresses), role changes, deactivations, password resets, deletions, grade overrides, submission grading, attendance corrections, staff-sent notifications, and creating, changing or deleting courses, assignments and quizzes. Entries record who, what, which record, the before/after values and the IP address. Grade overrides are saved in the same transaction as their audit entry; the rest are best-effort. The page filters by action, record type and date, and shows what changed.
+- **Dashboards**: each role has its own page under the four stat cards (`GET /dashboard/stats`). Every section loads on its own: if one fails it shows its own "could not be loaded" message with a Retry button and the rest of the page keeps working, and the page refreshes every minute while the browser tab is visible.
+  - **Student**: today's classes with their own attendance; a to-do list (unsubmitted assignments with overdue ones flagged, then in-person items and exams by date, then online quizzes not yet taken); a card for each course with its unread count; recent grades with the teacher's feedback; "Needs your attention" for teacher notes they have not seen; and discussion highlights (unread discussion notifications).
+  - **Teacher**: **Pending scores** (hand-ins still to be graded, plus in-person assignments, quizzes and exams whose date has passed and that still have enrolled students without a score; online quizzes grade themselves and never appear; oldest first, each linking to the item or its score sheet), today's classes with whether attendance has been taken, open notes to students, draft items waiting to be published, course cards, and recent student activity. The *Students* stat counts only students enrolled in their own courses.
+  - **Admin**: set-up problems that need fixing (courses with no timetable entry, no active students or no modules; teachers with no courses; students enrolled nowhere), the school at a glance with a 7-day activity chart (events, sign-ins, failed sign-ins, hand-ins), the school year's counts, and the latest changes (who, what, when only, with no IP address or before/after values; sign-ins are left out of this list but counted above and kept in Audit Logs).
+- **Crash protection**: if a page fails while drawing (for example after an unexpected response), only the page content is replaced by a "Something went wrong on this page" card with *Try again*, *Go to dashboard* and *Reload page*; the menu and top bar stay and going to another page clears it. *Try again* also forgets the data the page had loaded so it asks the server again.
 - **Phones and tablets**: the whole app is usable on a phone (see *Phones and tablets* below).
 
 ### File uploads
@@ -106,7 +111,7 @@ Other scripts, run inside `server/` or `client/` (the repo root has no scripts):
 | `CORS_ORIGIN`                                                          | Allowed frontend origin, e.g. `http://localhost:5173`. Also the only origin allowed to send POST/PUT/PATCH/DELETE requests (CSRF defense) |
 | `TRUST_PROXY_HOPS`                                                     | Optional. Proxies in front of the server (default `1`, right for Render). Rate limits use the client address, so a wrong value makes everyone look like one network |
 | `DATABASE_URL`                                                         | Neon connection string (`?sslmode=require`)                                     |
-| `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`                              | Token signing secrets (use long random values)                                  |
+| `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`                              | Token signing secrets (use two different long random values, at least 32 characters). Required: the server refuses to start without them, and warns if they are short or identical |
 | `JWT_ACCESS_EXPIRES_IN`, `JWT_REFRESH_EXPIRES_IN`                      | Token lifetimes (default `15m` / `7d`)                                          |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Required: the server refuses to start without them (`src/config/cloudinary.ts`) |
 
@@ -122,7 +127,7 @@ VITE_API_URL=http://localhost:4000     # optional; defaults to /api (Vite dev pr
 
 The app expects these tables (derived from the queries in `server/src/controllers/`):
 
-`users`, `profiles`, `students`, `teachers`, `courses`, `modules`, `assignments`, `submissions`, `quizzes`, `quiz_questions`, `quiz_attempts`, `grades`, `attendance`, `timetable`, `discussion_threads`, `discussion_replies`, `discussion_reports`, `notifications`, `audit_logs`, `enrollments`, `quiz_sessions`, `exams`, `manual_scores`, `coursework_mentions`.
+`users`, `profiles`, `students`, `teachers`, `courses`, `modules`, `assignments`, `submissions`, `quizzes`, `quiz_questions`, `quiz_attempts`, `grades`, `attendance`, `timetable`, `discussion_threads`, `discussion_replies`, `discussion_reports`, `notifications`, `audit_logs`, `enrollments`, `quiz_sessions`, `exams`, `manual_scores`, `coursework_mentions`, `announcements`.
 
 There is no full schema file in the repo yet; create the tables in Neon first. Column names are the ones the controllers use.
 
@@ -137,6 +142,8 @@ Run these by hand in the Neon SQL editor. All are safe to run more than once. Sc
 | `coursework-mentions.sql`          | **Before** deploying the mentions server       | Creates `coursework_mentions`. The server refuses to start until it has been run. Nothing existing changes |
 | `coursework-exams.sql`             | **Before** deploying the exams server          | Adds `assignments.delivery`/`room`, `quizzes.delivery`/`scheduled_at`/`room`/`details`/`max_score`, and the `exams` and `manual_scores` tables. Existing assignments and quizzes stay online. The server refuses to start until it has been run |
 | `quiz-timer.sql`                   | **Before** deploying the quiz timer server     | Creates `quiz_sessions` and adds `quiz_attempts.auto_submitted`. The server refuses to start until it has been run |
+| `announcements.sql`                | **Before** deploying the announcements server | Creates `announcements`. The server refuses to start until it has been run. Nothing existing changes |
+| `notifications-course-id.sql`      | **Before** deploying the per-course notifications server | Adds the optional `notifications.course_id`, a small index for unread counts, and fills in old notifications from the course their link points to. Run it after `coursework-exams.sql` and `discussions.sql`, which it reads. The server refuses to start until it has been run; the server you run today keeps working after it |
 | `users-email-lower-index.sql`      | Anytime (recommended)                          | One account per email regardless of capitalization, enforced by the database. Stops with a list if two existing accounts differ only in capitalization |
 | `cloudinary-uploads.sql`           | **Before** deploying the upload update (the server checks at startup) | Adds the file columns for submissions, assignment materials and quiz question pictures, and lets `submissions.file_url` be NULL (a file hand-in has no link) |
 | `token-revocation.sql`             | **Before** deploying the current server                                  | Adds `users.tokens_valid_after`; the API reads it on every request                                                                                                           |
@@ -150,6 +157,8 @@ Run these by hand in the Neon SQL editor. All are safe to run more than once. Sc
 | `timetable-constraints.sql`        | After deploying the timetable update                                     | Optional safety net. Check for duplicates first; adds time/day checks and unique indexes so a teacher, room or course cannot be double-booked even by two simultaneous saves |
 | `drop-students-cumulative-gpa.sql` | Eventually, once the latest code has been running fine                   | Drops the unused `students.cumulative_gpa` column                                                                                                                            |
 
+**A safe order for a new database.** After creating the base tables: `token-revocation`, `users-created-by`, `users-email-lower-index`, `assignment-publish`, `cloudinary-uploads`, `discussions`, `attendance-unique-index`, `notifications-audit-hardening` (then, optionally, `audit-logs-append-only`), `course-enrollments`, `quiz-timer`, `coursework-exams`, `coursework-mentions`, `announcements`, `notifications-course-id`. The optional ones (`2d-backfill-grades`, then `2d-optional-unique-indexes`, `timetable-constraints`, `drop-students-cumulative-gpa`) come last. Where a script depends on another, its row above says so; the server also checks at startup and names the script that is missing.
+
 ## API Overview
 
 All routes are under `/api` and need a valid session except `/auth/login`, `/auth/logout`, `/auth/refresh` and `/health`.
@@ -158,7 +167,7 @@ All routes are under `/api` and need a valid session except `/auth/login`, `/aut
 |----------------------------------|----------------------------------------------------------------------------------------------------------------------------|
 | `/auth`                          | `login`, `logout`, `refresh`, `me`, `PATCH me` (own details), `PUT me/password`, `PUT/DELETE me/avatar` (`register` is disabled) |
 | `/users`                         | List/create/edit, activate/deactivate, reset password, delete (admin/teacher, role-limited)                                |
-| `/students`                      | List (admin/teacher), detail, `export/csv` (admin)                                                                         |
+| `/students`                      | List (admin/teacher), detail (staff, or a student for their own record only), `export/csv` (admin)                         |
 | `/teachers`                      | List (admin)                                                                                                               |
 | `/courses`, `/modules`           | CRUD scoped to the owning teacher or an admin; students only get the courses they are enrolled in. `GET/POST /courses/:id/enrollments` and `DELETE /courses/:id/enrollments/:student_id` (the course's teacher or an admin) |
 | `/upload`                        | `POST /:kind` (`image`, `video` or `file`; field name `file`) and `DELETE /:publicId`, admin/teacher only; stored in Cloudinary |
@@ -171,22 +180,23 @@ All routes are under `/api` and need a valid session except `/auth/login`, `/aut
 | `/attendance`                    | List, `roster` (admin/teacher), `summary/:student_id`, `POST /` (one record) and `POST /bulk` (admin/teacher)              |
 | `/timetable`                     | List, create, update, delete (admin/teacher); double-booking returns 409                                                   |
 | `/discussions`                   | `GET /:course_id` (threads), `POST /`, `GET/PATCH/DELETE /threads/:id`, `POST /threads/:id/report`, `GET/POST /:thread_id/replies`, `PATCH/DELETE /replies/:id`, `POST /replies/:id/report` |
-| `/notifications`                 | `GET /`, `GET /unread-count`, `PATCH /read-all`, `PATCH /:id/read`, `DELETE /:id`, and `POST /` (staff send a message; teachers only to students) |
+| `/announcements`                 | `GET /` (what is live for me), `GET ?history=true` (admin: all; teacher: their own, including expired), `POST` (admin: any audience; teacher: the students of their own course), `PATCH /:id`, `DELETE /:id` (the author or an admin; soft delete) |
+| `/notifications`                 | `GET /`, `GET /unread-count`, `GET /unread-by-course`, `PATCH /read-all`, `PATCH /:id/read`, `DELETE /:id`, and `POST /` (staff send a message; teachers only to students) |
 | `/audit-logs`                    | Admin only; read-only, with `action`, `entity_type`, `entity_id`, `from`, `to`, `page` and `limit` filters                |
-| `/dashboard/stats`               | Role-specific counts                                                                                                       |
+| `/dashboard`                     | `GET /stats` (the four role-specific counts), `GET /student`, `GET /teacher`, `GET /admin` (one per role; each returns independent sections plus an `errors` entry for any that failed) |
 | `/health`                        | Liveness check                                                                                                             |
 
 ## Deployment
 
 The client and the API are deployed separately, and each needs to know the other's address.
 
-**Client on Vercel**: Framework preset Vite, root directory `client`, build command `npm run build`, output directory `dist`, and the environment variable `VITE_API_URL=https://<your-api>.onrender.com`. The single-page-app rewrite is already in `client/vercel.json`.
+**Client on Vercel**: Framework preset Vite, root directory `client`, build command `npm run build`, output directory `dist`, and the environment variable `VITE_API_URL=https://<your-api>.onrender.com`. The single-page-app rewrite and the security headers (see *Security*) are already in `client/vercel.json`.
 
 **API on Render**: runtime Node, root directory `server`, build command `npm install && npm run build`, start command `npm start`, and the server environment variables above with `NODE_ENV=production`. Render provides `PORT` itself.
 
 Things that commonly go wrong:
 
-- `CORS_ORIGIN` must be exactly the client's address, such as `https://pbsi-platform.vercel.app`, with no trailing slash. The server reads only `CORS_ORIGIN`; if it is missing it falls back to `http://localhost:5173` and the browser blocks every request with a CORS error.
+- `CORS_ORIGIN` must be exactly the client's address, such as `https://pbsi-platform.vercel.app`, with no trailing slash. The server reads only `CORS_ORIGIN`; with `NODE_ENV=production` it refuses to start without it (naming the setting), and in development it falls back to `http://localhost:5173`.
 - Run the SQL scripts marked **Before** in Neon before deploying the server that needs them.
 - On Render's free plan the API sleeps when idle, so the first request after a quiet period can take about 30 seconds. The client waits and retries instead of signing people out.
 
@@ -201,11 +211,25 @@ Things that commonly go wrong:
 - **Sign-in**: emails are trimmed and compared in lower case (`lower(email)`), so `Juan@School.com` and `juan@school.com` are the same account. An unknown email takes as long to reject as a wrong password, so response time does not reveal which emails exist.
 - **CSV export**: cells that start with `=`, `+`, `-` or `@` are written as text so a spreadsheet never runs them as a formula; plain numbers and phone numbers are untouched. The file carries a UTF-8 BOM so Excel shows names such as Peña correctly.
 - Module uploads are restricted to admins and teachers, and the delete endpoint only touches module media. Profile pictures are the one upload open to everyone, for their own account only (JPG/PNG/WebP, checked by content, stored at `pbsi/avatars/<user id>`).
+- Tokens are verified as HS256 only (the algorithm they are signed with), so a token signed another way is refused.
+- **Student records**: `GET /students/:id` returns an email, phone, date of birth and address, so only staff may open any student's; a student gets the same "not found" for anyone but themselves.
+- **Error responses**: an unexpected failure (HTTP 5xx) is written to the server log (Render's *Logs* tab, with the method and path) and the browser only gets "Something went wrong on our side", because a database or library message can reveal table and column names. Expected errors (400, 401, 403, 404, 409) keep their own messages. In development the real message and stack are shown.
+- **Startup check** (`server/src/config/env.ts`): the server refuses to start if a JWT secret is missing, or if `CORS_ORIGIN` is missing in production, and only warns about secrets that are short or identical or a `CORS_ORIGIN` with a trailing slash.
+- **Website headers** (`client/vercel.json`): the site cannot be put in a frame by another website (`X-Frame-Options: DENY` and `frame-ancestors 'none'`, which stops clickjacking), plus `nosniff`, a strict referrer policy and a permissions policy that turns off camera, microphone and location. A strict Content-Security-Policy (scripts only from the site itself, connections only to the site and `*.onrender.com`) is sent in **report-only** mode: the browser console lists anything it would block but nothing is blocked yet. To enforce it, move that policy to `Content-Security-Policy`; first check your own API address matches `connect-src` and look for "Content Security Policy" messages in the browser console while using every page.
+- Links people can store (submission links, material links, module and content links) must start with `http://` or `https://`, checked by the server, and the pages only show them as links when they do.
 - Audit log entries for sensitive admin and grading actions.
 
 ## Known Gaps
 
-- No schema/migration tool or tests yet; schema changes are manual SQL in `server/sql/`.
+- No schema/migration tool and no automated tests or CI yet; schema changes are manual SQL in `server/sql/` and changes are checked by hand.
 - Uploads are buffered in server memory (multer `memoryStorage`) before going to Cloudinary, so each kind has a cap: 100 MB for module videos, 10 MB for module images/files, 2 MB for profile pictures. Keep these at or below your Cloudinary plan's per-file limit.
 - Submission and material files are checked by extension and size only (no virus scan). They are never opened inline: downloads are `attachment` links.
 - `DESIGN_SYSTEM.md` documents a different repository (the PBSI marketing site).
+- Exams, in-person items and online work all count equally in a student's average; there is no weighting by type or by course.
+- Adjusting a grade that came from a score sheet (an exam or in-person item) changes the grade but not the raw score stored in `manual_scores`, so the score sheet keeps showing the original raw score.
+- The "PBSI is waking up" screen is a heuristic: it appears when a request has been pending for 6 seconds (`SLOW_REQUEST_MS` in `client/src/lib/serverStatus.ts`) or the host answers 502/503/504. A server that is awake but very slow can trigger it, and a slow wake-up under 6 seconds does not.
+- Notes to students (mentions) are acknowledge-only: a student can mark "Got it" but cannot reply. A "missed deadline" note does not resolve itself when the work is handed in later; the teacher marks it resolved.
+- The access token is also kept in `localStorage` (and sent as a Bearer header), which means a script injected into the page could read it. Rich text is sanitized with DOMPurify and everything else is escaped by React, and the website's Content-Security-Policy is report-only for now. Signing out does not cancel a refresh token that was already copied; it expires after 7 days (deactivating the account or resetting or changing its password cancels every session at once).
+- `npm audit` reports a high-severity advisory in `zod` (it can use a lot of memory validating a huge list). It is an accepted risk: every array the API validates has a `.max()`, and request bodies are limited to 10 kB. Fixing it means moving to zod 4, a breaking upgrade.
+- Passwords are hashed with bcrypt, which only reads the first 72 bytes; the 128-character limit therefore allows characters beyond that to be ignored.
+- Dashboards and the notification badge refresh by polling (every minute while the tab is open), not live.

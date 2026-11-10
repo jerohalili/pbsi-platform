@@ -8,15 +8,22 @@ export interface AppError extends Error {
 
 export function errorHandler(
   err: AppError,
-  _req: Request,
+  req: Request,
   res: Response,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _next: NextFunction,
 ): void {
   const statusCode = err instanceof ZodError ? 400 : (err.statusCode ?? 500);
 
+  // An unexpected failure is written to the server log (Render's Logs tab) for the developer, and
+  // the browser gets a plain sentence: a database or library message can reveal table and column
+  // names. Expected errors (400, 401, 403, 404, 409 ...) keep their own message.
+  const unexpected = statusCode >= 500;
+  if (unexpected) console.error(`[ERROR] ${req.method} ${req.path}:`, err);
+  const hideDetails = unexpected && process.env.NODE_ENV !== 'development';
+
   const response: Record<string, unknown> = {
-    error: err.message || 'Internal server error',
+    error: hideDetails ? 'Something went wrong on our side. Please try again.' : err.message || 'Internal server error',
   };
 
   if (err instanceof ZodError) {

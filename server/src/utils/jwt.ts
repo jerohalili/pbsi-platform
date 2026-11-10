@@ -16,9 +16,9 @@ export function signRefreshToken(payload: object): string {
 }
 
 export function verifyAccessToken(token: string): any {
-  return jwt.verify(token, ACCESS_SECRET);
+  return jwt.verify(token, ACCESS_SECRET, { algorithms: ['HS256'] });
 }
 
 export function verifyRefreshToken(token: string): any {
-  return jwt.verify(token, REFRESH_SECRET);
+  return jwt.verify(token, REFRESH_SECRET, { algorithms: ['HS256'] });
 }

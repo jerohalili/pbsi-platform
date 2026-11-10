@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { sql } from '../config/db.js';
 import type { AppError } from '../middleware/errorHandler.js';
-import { parseUuid } from '../utils/access.js';
+import { getOwnStudentId, parseUuid } from '../utils/access.js';
 import { CSV_BOM, csvCell } from '../utils/csv.js';
 
 export async function listStudents(_req: Request, res: Response): Promise<void> {
@@ -41,6 +41,14 @@ export async function listStudents(_req: Request, res: Response): Promise<void> 
 export async function getStudent(_req: Request, res: Response): Promise<void> {
   // A malformed id is a 400 here instead of a Postgres "invalid input syntax for type uuid" 500.
   const id = parseUuid(_req.params.id, 'student id');
+
+  // The record holds an email, phone, date of birth and address: staff may open any student's,
+  // a student only their own. Anyone else gets the same answer as for an id that does not exist.
+  if (_req.user?.role === 'student' && (await getOwnStudentId(_req.user.id)) !== id) {
+    const err = new Error('Student not found') as AppError;
+    err.statusCode = 404;
+    throw err;
+  }
 
   const [student] = await sql`
     SELECT s.id, s.student_id, s.enrollment_date,
