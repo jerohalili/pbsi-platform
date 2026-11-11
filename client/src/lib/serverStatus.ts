@@ -24,12 +24,20 @@ export interface ServerState {
 /** A request still waiting after this long means the server is probably starting up. */
 export const SLOW_REQUEST_MS = 6000;
 const POLL_EVERY_MS = 3000;
+/**
+ * After a health check succeeds, requests that start in this window are not judged "slow". The
+ * health route answers without touching the database, so the server can be awake while the first
+ * database queries (Neon waking up too) still take a few seconds. Without this, those slow
+ * queries flipped the screen straight back to "waking up" with the wait counter at 0.
+ */
+const VOUCH_WINDOW_MS = 60000;
 /** One health check may hang while the server starts; give it generous time before trying again. */
 const HEALTH_TIMEOUT_MS = 25000;
 
 let state: ServerState = { status: 'ok', since: null };
 const listeners = new Set<() => void>();
 let healthUrl = '/api/health';
+let vouchedUntil = 0;
 
 export function configureServerStatus(options: { healthUrl: string }): void {
   healthUrl = options.healthUrl;
@@ -43,10 +51,12 @@ export function subscribeServerState(listener: () => void): () => void {
   return () => listeners.delete(listener);
 }
 
-function setStatus(status: ServerStatus): void {
+function setStatus(status: ServerStatus, sinceHint?: number): void {
   if (state.status === status) return;
   // Moving between "waking" and "offline" keeps the original start time: it is one stretch of trouble.
-  const since = status === 'ok' ? null : (state.since ?? Date.now());
+  // `sinceHint` is when the failing request began, so the wait counter continues from the moment
+  // the person actually started waiting instead of from the moment the app noticed.
+  const since = status === 'ok' ? null : (state.since ?? sinceHint ?? Date.now());
   state = { status, since };
   listeners.forEach((listener) => listener());
 }
@@ -87,6 +97,7 @@ export function noteRequestEnd(
   cancelled = false,
 ): void {
   const id = config ? (config as Tracked)[TRACK_KEY] : undefined;
+  const startedAt = id ? pending.get(id)?.started : undefined;
   if (config && id) {
     pending.delete(id);
     (config as Tracked)[TRACK_KEY] = undefined;
@@ -96,15 +107,16 @@ export function noteRequestEnd(
     watcher = null;
   }
   if (cancelled) return;
-  if (status === undefined || status === 502 || status === 503 || status === 504) markUnreachable();
+  if (status === undefined || status === 502 || status === 503 || status === 504) markUnreachable(startedAt);
   else markReachable();
 }
 
 function checkForSlowRequests(): void {
   const now = Date.now();
+  if (now < vouchedUntil) return;
   for (const request of pending.values()) {
     if (!request.vouched && now - request.started > SLOW_REQUEST_MS) {
-      markUnreachable();
+      markUnreachable(request.started);
       return;
     }
   }
@@ -114,8 +126,8 @@ function markReachable(): void {
   setStatus('ok');
 }
 
-function markUnreachable(): void {
-  setStatus(typeof navigator !== 'undefined' && navigator.onLine === false ? 'offline' : 'waking');
+function markUnreachable(sinceHint?: number): void {
+  setStatus(typeof navigator !== 'undefined' && navigator.onLine === false ? 'offline' : 'waking', sinceHint);
   void startPolling();
 }
 
@@ -147,6 +159,7 @@ async function startPolling(): Promise<void> {
         pending.forEach((request) => {
           request.vouched = true;
         });
+        vouchedUntil = Date.now() + VOUCH_WINDOW_MS;
         setStatus('ok');
         break;
       }
