@@ -79,25 +79,26 @@ export default function StudentsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
+        <div data-tour="stu-header">
           <h1 className="text-2xl font-bold">Student Directory</h1>
           <p className="text-muted-foreground">Manage and view student records.</p>
         </div>
         <div className="flex items-center gap-2">
           <Input
+            data-tour="stu-search"
             type="text"
             placeholder="Search by name or student ID..."
             className="w-64 bg-card"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
           />
-          <Button onClick={() => setForm({ mode: 'create' })}>
+          <Button data-tour="stu-add" onClick={() => setForm({ mode: 'create' })}>
             <UserPlus className="w-4 h-4 mr-2" /> Add Student
           </Button>
         </div>
       </div>
 
-      <div className="rounded-xl border border-input bg-card overflow-x-auto">
+      <div data-tour="stu-table" className="rounded-xl border border-input bg-card overflow-x-auto">
         {isLoading ? (
           <div className="p-8 text-center text-muted-foreground">Loading students...</div>
         ) : isError ? (
@@ -122,7 +123,7 @@ export default function StudentsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {students.map((s) => {
+              {students.map((s, i) => {
                 const name = `${s.first_name} ${s.last_name}`;
                 return (
                   <TableRow key={s.id} className={s.is_active ? '' : 'opacity-60'}>
@@ -146,7 +147,7 @@ export default function StudentsPage() {
                     <TableCell className="text-muted-foreground text-sm">
                       {(Array.isArray(s.subjects_assigned) ? s.subjects_assigned.join(', ') : '') || '—'}
                     </TableCell>
-                    <TableCell className="text-right whitespace-nowrap">
+                    <TableCell data-tour={i === 0 ? 'stu-actions' : undefined} className="text-right whitespace-nowrap">
                       <Button variant="ghost" size="sm" asChild>
                         <Link to={`/students/${s.id}`}>View</Link>
                       </Button>

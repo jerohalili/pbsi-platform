@@ -120,16 +120,16 @@ export default function UsersPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
+        <div data-tour="us-header">
           <h1 className="text-2xl font-bold">User Management</h1>
           <p className="text-muted-foreground">Create, edit and manage every account in the system.</p>
         </div>
-        <Button onClick={() => setForm({ mode: 'create' })}>
+        <Button data-tour="us-add" onClick={() => setForm({ mode: 'create' })}>
           <UserPlus className="w-4 h-4 mr-2" /> Add user
         </Button>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-2">
+      <div data-tour="us-filters" className="flex flex-col sm:flex-row gap-2">
         <Input
           className="bg-card sm:max-w-xs"
           placeholder="Search name, email or ID…"
@@ -149,7 +149,7 @@ export default function UsersPage() {
         </select>
       </div>
 
-      <div className="rounded-xl border border-input bg-card overflow-x-auto">
+      <div data-tour="us-table" className="rounded-xl border border-input bg-card overflow-x-auto">
         {isLoading ? (
           <div className="p-8 text-center text-muted-foreground">Loading accounts…</div>
         ) : isError ? (
@@ -173,7 +173,7 @@ export default function UsersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map((u) => {
+              {users.map((u, i) => {
                 const isSelf = u.id === me?.id;
                 const name = fullName(u);
                 return (
@@ -198,7 +198,7 @@ export default function UsersPage() {
                         {u.is_active ? 'Active' : 'Inactive'}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right whitespace-nowrap">
+                    <TableCell data-tour={i === 0 ? 'us-actions' : undefined} className="text-right whitespace-nowrap">
                       <Button
                         variant="ghost"
                         size="icon"

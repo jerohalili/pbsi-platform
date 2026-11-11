@@ -39,7 +39,7 @@ export default function StudentDetailPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
+        <div data-tour="sd-header">
           <h1 className="text-2xl font-bold">Student Profile</h1>
           <p className="text-muted-foreground">{s.student_id}</p>
         </div>
@@ -47,7 +47,7 @@ export default function StudentDetailPage() {
 
       <div className="grid gap-6 md:grid-cols-3">
         <div className="md:col-span-2">
-          <Card>
+          <Card data-tour="sd-profile">
             <CardHeader>
               <CardTitle className="flex items-center gap-3">
                 <UserAvatar
@@ -95,7 +95,7 @@ export default function StudentDetailPage() {
                   </div>
                 </div>
               </div>
-              <div>
+              <div data-tour="sd-subjects">
                 <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                   Subjects Assigned
                 </div>
@@ -109,7 +109,7 @@ export default function StudentDetailPage() {
           </Card>
         </div>
         <div className="col-span-1 md:col-span-2 lg:col-span-1">
-          <Card>
+          <Card data-tour="sd-average">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <GraduationCap className="w-5 h-5" /> Average grade
