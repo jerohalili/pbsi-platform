@@ -56,7 +56,7 @@ export default function AnnouncementsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
+        <div data-tour="an-header">
           <h1 className="text-2xl font-bold">Announcements</h1>
           <p className="text-muted-foreground">
             {role === 'admin'
@@ -65,6 +65,7 @@ export default function AnnouncementsPage() {
           </p>
         </div>
         <Button
+          data-tour="an-new"
           onClick={() => {
             setEditing(null);
             setFormOpen(true);
@@ -74,7 +75,7 @@ export default function AnnouncementsPage() {
         </Button>
       </div>
 
-      <div className="flex gap-1" role="tablist" aria-label="Announcement list">
+      <div data-tour="an-tabs" className="flex gap-1" role="tablist" aria-label="Announcement list">
         {(['live', 'expired'] as Filter[]).map((f) => (
           <Button key={f} role="tab" aria-selected={filter === f} variant={filter === f ? 'default' : 'ghost'} size="sm" onClick={() => setFilter(f)}>
             {f === 'live' ? 'Live' : 'Expired'} ({all.filter((a) => (f === 'expired' ? a.is_expired : !a.is_expired)).length})
@@ -96,19 +97,19 @@ export default function AnnouncementsPage() {
           </Button>
         </Card>
       ) : shown.length === 0 ? (
-        <Card className="flex flex-col items-center gap-2 p-10 text-center text-muted-foreground">
+        <Card data-tour="an-empty" className="flex flex-col items-center gap-2 p-10 text-center text-muted-foreground">
           <Megaphone className="h-8 w-8" aria-hidden="true" />
           <p>{filter === 'live' ? 'No live announcements.' : 'No expired announcements.'}</p>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {shown.map((a) => (
+        <div data-tour="an-list" className="space-y-3">
+          {shown.map((a, i) => (
             <AnnouncementCard
               key={a.id}
               announcement={a}
               actions={
                 a.can_manage ? (
-                  <div className="flex">
+                  <div data-tour={i === 0 ? 'an-actions' : undefined} className="flex">
                     <Button variant="ghost" size="sm" aria-label={`Edit ${a.title}`} onClick={() => { setEditing(a); setFormOpen(true); }}>
                       <Pencil className="h-4 w-4" />
                     </Button>

@@ -162,3 +162,33 @@ export const quizDetailTour = itemTour('quiz', () => {
 });
 
 export const examDetailTour = itemTour('exam', () => []);
+
+/** /quiz-results/:attemptId (students see their own attempt; admins and teachers see a student's) */
+export const quizResultTour: TourBuilder = () => {
+  const steps: DriveStep[] = [
+    step('qr-header', 'Quiz result', 'The quiz, its course and when it was submitted. If a teacher or admin is viewing, the student\u2019s name is shown too.'),
+  ];
+  if (present('qr-auto')) {
+    steps.push(
+      step(
+        'qr-auto',
+        'Submitted automatically',
+        'The time limit ended, so the quiz was submitted at the deadline. Only answers saved by then were graded, and unanswered questions scored zero.',
+      ),
+    );
+  }
+  steps.push(
+    step('qr-score', 'Score', 'The percentage, the points earned out of the total, and how many questions were correct.'),
+  );
+  if (present('qr-first')) {
+    steps.push(
+      step(
+        'qr-first',
+        'Each question',
+        'A green check means correct and a red cross means incorrect. Each question shows its points, the answer given, and the correct answer when it was wrong.',
+        'top',
+      ),
+    );
+  }
+  return steps;
+};

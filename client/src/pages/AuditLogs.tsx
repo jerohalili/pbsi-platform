@@ -187,7 +187,7 @@ export default function AuditLogsPage() {
   return (
     <div className="w-full bg-site-bg px-0 py-6 md:min-h-screen md:px-4 md:py-12">
       <div className="max-w-5xl mx-auto">
-        <div className="flex items-center gap-2 mb-4">
+        <div data-tour="al-header" className="flex items-center gap-2 mb-4">
           <ShieldAlert className="w-5 h-5 text-site-muted" />
           <h1 className="text-2xl font-bold text-site-text">Audit Logs</h1>
         </div>
@@ -196,7 +196,7 @@ export default function AuditLogsPage() {
           Times are shown in Philippine time.
         </p>
 
-        <div className="mb-4 flex flex-wrap items-end gap-3">
+        <div data-tour="al-filters" className="mb-4 flex flex-wrap items-end gap-3">
           <label className="flex flex-col gap-1 text-xs font-medium text-site-muted">
             Action
             <select
@@ -278,7 +278,7 @@ export default function AuditLogsPage() {
             </Button>
           </div>
         ) : (
-          <div className="rounded-xl border border-site-border bg-site-card overflow-hidden">
+          <div data-tour="al-table" className="rounded-xl border border-site-border bg-site-card overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
@@ -307,13 +307,14 @@ export default function AuditLogsPage() {
                       </td>
                     </tr>
                   ) : (
-                    logs.map((l) => {
+                    logs.map((l, i) => {
                       const isOpen = expanded === l.id;
                       return (
                         <Fragment key={l.id}>
                           <tr className={`border-b border-site-border ${isOpen ? 'bg-primary/5' : ''}`}>
                             <td className="px-3 py-3">
                               <button
+                                data-tour={i === 0 ? 'al-details' : undefined}
                                 type="button"
                                 onClick={() => setExpanded(isOpen ? null : l.id)}
                                 aria-expanded={isOpen}
@@ -336,6 +337,7 @@ export default function AuditLogsPage() {
                             <td className="px-4 py-3 text-sm text-site-muted">
                               <div>{humanize(l.entity_type)}</div>
                               <button
+                                data-tour={i === 0 ? 'al-record' : undefined}
                                 type="button"
                                 title="Show the history of this record"
                                 onClick={() => changeFilter({ entityId: l.entity_id })}
@@ -365,7 +367,7 @@ export default function AuditLogsPage() {
         )}
 
         {status !== 'error' && (
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-site-muted">
+          <div data-tour="al-pager" className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-site-muted">
             <span>{total === 0 ? 'No entries' : `Showing ${firstShown}–${lastShown} of ${total}`}</span>
             <div className="flex items-center gap-2">
               <Button

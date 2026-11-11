@@ -83,3 +83,87 @@ export const studentDetailTour: TourBuilder = () => {
   );
   return steps;
 };
+
+/** /announcements (admin and teacher; students are redirected to the dashboard) */
+export const announcementsTour: TourBuilder = ({ role }) => {
+  const admin = role === 'admin';
+  const steps: DriveStep[] = [
+    tip(
+      'an-header',
+      'Announcements',
+      admin
+        ? 'Post to everyone, to teachers, to students, or to one course.'
+        : 'Post to the students of your courses. Admins can see everything you post.',
+    ),
+    tip(
+      'an-new',
+      'New announcement',
+      admin
+        ? 'Choose the audience (everyone, teachers, students or one course), then write a title and a message. Everyone in the audience is notified when you post. You can also set a time to hide it automatically, and mark it Urgent to show a red banner on every page until it expires.'
+        : 'Choose one of your courses, then write a title and a message. The students enrolled in it are notified when you post. You can also set a time to hide it automatically, and mark it Urgent to show a red banner on every page until it expires.',
+      'left',
+    ),
+    tip(
+      'an-tabs',
+      'Live and Expired',
+      'Live announcements are showing now. Expired ones have passed their hide-after time and no longer appear on dashboards or the banner. The number is how many are in each.',
+    ),
+  ];
+  if (present('an-list')) {
+    steps.push(
+      tip('an-list', 'Your announcements', 'Badges show Urgent, Expired and the audience. Each one shows who posted it, when, and when it expires.', 'top'),
+    );
+  } else if (present('an-empty')) {
+    steps.push(tip('an-empty', 'Nothing here yet', 'Use \u201cNew announcement\u201d to post the first one.', 'top'));
+  }
+  if (present('an-actions')) {
+    steps.push(
+      tip(
+        'an-actions',
+        'Edit or delete',
+        'Edit changes an announcement, and editing does not notify anyone again. Delete asks you to confirm: it disappears for everyone, but people who were already notified keep their notification. These buttons appear only on announcements you can manage.',
+        'left',
+      ),
+    );
+  }
+  return steps;
+};
+
+/** /audit-logs (admin only) */
+export const auditLogsTour: TourBuilder = () => {
+  const steps: DriveStep[] = [
+    tip(
+      'al-header',
+      'Audit logs',
+      'A permanent record of sensitive actions: who did what, to which record, and what changed. Times are shown in Philippine time.',
+    ),
+    tip('al-filters', 'Narrow it down', 'Filter by action, record type and a date range. \u201cClear filters\u201d appears once a filter is on.'),
+  ];
+  if (present('al-table')) {
+    steps.push(
+      tip(
+        'al-table',
+        'The log',
+        'Each row shows when it happened, who did it (the actor), what they did, which record it touched and the IP address it came from.',
+        'top',
+      ),
+    );
+  }
+  if (present('al-details')) {
+    steps.push(tip('al-details', 'See what changed', 'The arrow opens that entry\u2019s details, including what changed.', 'right'));
+  }
+  if (present('al-record')) {
+    steps.push(
+      tip(
+        'al-record',
+        'History of one record',
+        'Click a short record ID to show only the history of that record. \u201cShow all records\u201d brings the full log back.',
+        'top',
+      ),
+    );
+  }
+  if (present('al-pager')) {
+    steps.push(tip('al-pager', 'Pages', 'Move between pages of entries. \u201cShowing X\u2013Y of Z\u201d tells you where you are.', 'top'));
+  }
+  return steps;
+};

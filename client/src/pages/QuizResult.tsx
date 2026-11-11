@@ -83,7 +83,7 @@ export default function QuizResultPage() {
     <div className="space-y-8 max-w-3xl">
       <div className="space-y-4">
         {back}
-        <div className="space-y-2">
+        <div data-tour="qr-header" className="space-y-2">
           <div className="flex items-center gap-2 flex-wrap">
             <Badge variant="outline">{attempt.course_code}</Badge>
             {attempt.student_name && <span className="text-sm text-muted-foreground">{attempt.student_name}</span>}
@@ -93,6 +93,7 @@ export default function QuizResultPage() {
         </div>
         {attempt.auto_submitted && (
           <div
+            data-tour="qr-auto"
             role="status"
             className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-100 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-900 dark:text-amber-100"
           >
@@ -104,7 +105,7 @@ export default function QuizResultPage() {
             </p>
           </div>
         )}
-        <Card className="p-6">
+        <Card data-tour="qr-score" className="p-6">
           <p className="text-3xl font-bold">{attempt.score}%</p>
           <p className="text-sm text-muted-foreground mt-1">
             {attempt.earned_points} of {attempt.total_points} points · {correctCount} of {results.length} questions correct
@@ -115,7 +116,7 @@ export default function QuizResultPage() {
       <section className="space-y-3">
         <h2 className="text-xl font-bold">Your answers</h2>
         {results.map((result, index) => (
-          <Card key={result.question_id} className="p-5 space-y-3">
+          <Card key={result.question_id} data-tour={index === 0 ? 'qr-first' : undefined} className="p-5 space-y-3">
             <div className="flex items-start gap-3">
               {result.is_correct ? (
                 <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" aria-label="Correct" />
