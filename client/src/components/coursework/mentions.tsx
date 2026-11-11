@@ -364,7 +364,7 @@ export function MentionsPanel({ itemType, itemId, courseId, itemTitle, isPublish
   };
 
   return (
-    <section className="space-y-4">
+    <section data-tour="mp-panel" className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h2 className="text-xl font-bold">Notes to students</h2>
@@ -374,6 +374,7 @@ export function MentionsPanel({ itemType, itemId, courseId, itemTitle, isPublish
           </p>
         </div>
         <Button
+          data-tour="mp-write"
           onClick={() => setWriting(true)}
           disabled={!isPublished}
           title={isPublished ? undefined : 'Publish this first: students can only be mentioned on what they can see.'}
@@ -402,8 +403,8 @@ export function MentionsPanel({ itemType, itemId, courseId, itemTitle, isPublish
           No notes yet.{!isPublished && ' Publish this first, then you can write to students about it.'}
         </Card>
       ) : (
-        <div className="space-y-3">
-          {mentions.map((m) => (
+        <div data-tour="mp-list" className="space-y-3">
+          {mentions.map((m, i) => (
             <Card key={m.id} className={`p-4 space-y-3 ${m.resolved_at ? 'opacity-70' : ''}`}>
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div className="space-y-1 min-w-0">
@@ -424,7 +425,7 @@ export function MentionsPanel({ itemType, itemId, courseId, itemTitle, isPublish
                     {formatDateTime(m.created_at)}
                   </p>
                 </div>
-                <div className="flex gap-2 shrink-0">
+                <div data-tour={i === 0 ? 'mp-actions' : undefined} className="flex gap-2 shrink-0">
                   <Button variant="outline" size="sm" onClick={() => setResolved(m, !m.resolved_at)}>
                     {m.resolved_at ? 'Reopen' : 'Mark resolved'}
                   </Button>

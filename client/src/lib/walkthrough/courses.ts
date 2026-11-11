@@ -1,18 +1,12 @@
 import type { DriveStep } from 'driver.js';
 import type { TourBuilder } from './types.ts';
-import { present, sel } from './shell.ts';
-
-type Side = 'top' | 'bottom' | 'left' | 'right';
-
-function step(name: string, title: string, description: string, side: Side = 'bottom'): DriveStep {
-  return { element: sel(name), popover: { title, description, side, align: 'center' } };
-}
+import { present, tip } from './shell.ts';
 
 /** /courses */
 export const coursesTour: TourBuilder = ({ role }) => {
   const canCreate = role === 'admin' || role === 'teacher';
   const steps: DriveStep[] = [
-    step(
+    tip(
       'courses-header',
       'Your courses',
       canCreate
@@ -22,12 +16,12 @@ export const coursesTour: TourBuilder = ({ role }) => {
   ];
   if (canCreate && present('courses-new')) {
     steps.push(
-      step('courses-new', 'New course', 'Creates a course. Administrators also pick which teacher is in charge of it.'),
+      tip('courses-new', 'New course', 'Creates a course. Administrators also pick which teacher is in charge of it.'),
     );
   }
   if (present('courses-card')) {
     steps.push(
-      step(
+      tip(
         'courses-card',
         'Course card',
         canCreate
@@ -37,7 +31,7 @@ export const coursesTour: TourBuilder = ({ role }) => {
     );
   } else if (present('courses-empty')) {
     steps.push(
-      step(
+      tip(
         'courses-empty',
         'Nothing here yet',
         canCreate ? 'Use \u201cNew Course\u201d to create the first course.' : 'Courses appear here once you are enrolled in them.',
@@ -51,16 +45,16 @@ export const coursesTour: TourBuilder = ({ role }) => {
 export const courseDetailTour: TourBuilder = () => {
   const canEdit = present('cd-edit');
   const steps: DriveStep[] = [
-    step('cd-header', 'About this course', 'The course code, teacher, credits and description.'),
-    step('cd-discussions', 'Discussions', 'Opens the discussion board for this course.'),
+    tip('cd-header', 'About this course', 'The course code, teacher, credits and description.'),
+    tip('cd-discussions', 'Discussions', 'Opens the discussion board for this course.'),
   ];
   if (canEdit) {
     steps.push(
-      step('cd-edit', 'Edit or delete', 'Edit changes the course details. Delete is permanent, so it asks you to confirm first.'),
+      tip('cd-edit', 'Edit or delete', 'Edit changes the course details. Delete is permanent, so it asks you to confirm first.'),
     );
   }
   steps.push(
-    step(
+    tip(
       'cd-modules',
       'Modules',
       canEdit
@@ -71,11 +65,11 @@ export const courseDetailTour: TourBuilder = () => {
   );
   if (canEdit && present('cd-add-module')) {
     steps.push(
-      step('cd-add-module', 'Add module', 'Adds a module. Then press Edit on it to add text, video, images, files and links.'),
+      tip('cd-add-module', 'Add module', 'Adds a module. Then press Edit on it to add text, video, images, files and links.'),
     );
   }
   steps.push(
-    step(
+    tip(
       'cd-quizzes',
       'Quizzes',
       canEdit
@@ -83,7 +77,7 @@ export const courseDetailTour: TourBuilder = () => {
         : 'Online quizzes you can take, and in-person quizzes with their date and room.',
       'top',
     ),
-    step(
+    tip(
       'cd-exams',
       'Exams',
       canEdit
@@ -91,7 +85,7 @@ export const courseDetailTour: TourBuilder = () => {
         : 'Exams your teacher announced, with date and room. They are scored after your teacher checks your work in person.',
       'top',
     ),
-    step(
+    tip(
       'cd-assignments',
       'Assignments',
       canEdit
@@ -102,7 +96,7 @@ export const courseDetailTour: TourBuilder = () => {
   );
   if (canEdit && present('cd-students')) {
     steps.push(
-      step(
+      tip(
         'cd-students',
         'Students in this course',
         'Only the students listed here can see this course, its work and its quizzes. Use \u201cAdd students\u201d to enroll more.',
@@ -116,14 +110,14 @@ export const courseDetailTour: TourBuilder = () => {
 /** /courses/:courseId/modules/:moduleId/edit (admin and teacher only) */
 export const moduleEditTour: TourBuilder = () => {
   const steps: DriveStep[] = [
-    step('me-header', 'Editing a module', 'A module is one unit of the course: lesson notes plus content blocks for students to study.'),
-    step(
+    tip('me-header', 'Editing a module', 'A module is one unit of the course: lesson notes plus content blocks for students to study.'),
+    tip(
       'me-details',
       'Title and lesson notes',
       'Change the title or notes, then press Save changes. Cancel leaves without saving. Blocks below save by themselves.',
     ),
-    step('me-blocks', 'Content blocks', 'The blocks students see, in order. Every change to a block is saved instantly.', 'top'),
-    step(
+    tip('me-blocks', 'Content blocks', 'The blocks students see, in order. Every change to a block is saved instantly.', 'top'),
+    tip(
       'me-add-block',
       'Add a block',
       'Pick a type: text (with a small formatting toolbar), video, image, file or PDF, or a web link.',
@@ -132,7 +126,7 @@ export const moduleEditTour: TourBuilder = () => {
   ];
   if (present('me-block-actions')) {
     steps.push(
-      step(
+      tip(
         'me-block-actions',
         'Move, edit or delete',
         'The arrows reorder blocks. The pencil edits one, and for a file you can replace it. The bin deletes it after asking you to confirm.',

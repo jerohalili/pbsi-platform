@@ -1,26 +1,20 @@
 import type { DriveStep } from 'driver.js';
 import type { TourBuilder } from './types.ts';
-import { present, sel } from './shell.ts';
-
-type Side = 'top' | 'bottom' | 'left' | 'right';
-
-function step(name: string, title: string, description: string, side: Side = 'bottom'): DriveStep {
-  return { element: sel(name), popover: { title, description, side, align: 'center' } };
-}
+import { present, tip } from './shell.ts';
 
 /** /coursework */
 export const courseworkTour: TourBuilder = ({ role }) => {
   const student = role === 'student';
   const steps: DriveStep[] = [
-    step(
+    tip(
       'cw-header',
       'Coursework',
       student
         ? 'Your assignments, quizzes and exams in one place.'
         : 'Assignments, quizzes and exams in one place. Some are done online; others are announced here and scored by hand.',
     ),
-    step('cw-tabs', 'Kind of coursework', 'Switch between everything, assignments, quizzes and exams. The number is how many of each there are.'),
-    step(
+    tip('cw-tabs', 'Kind of coursework', 'Switch between everything, assignments, quizzes and exams. The number is how many of each there are.'),
+    tip(
       'cw-filters',
       'Filters',
       student
@@ -29,11 +23,11 @@ export const courseworkTour: TourBuilder = ({ role }) => {
     ),
   ];
   if (present('cw-new')) {
-    steps.push(step('cw-new', 'New', 'Pick the kind and the course, then finish the details on that course\u2019s page.'));
+    steps.push(tip('cw-new', 'New', 'Pick the kind and the course, then finish the details on that course\u2019s page.'));
   }
   if (present('cw-table')) {
     steps.push(
-      step(
+      tip(
         'cw-table',
         'Your list',
         student
@@ -44,7 +38,7 @@ export const courseworkTour: TourBuilder = ({ role }) => {
     );
   } else if (present('cw-empty')) {
     steps.push(
-      step('cw-empty', 'Nothing here yet', student ? 'Items from your courses will appear here.' : 'Use \u201cNew\u201d to add an assignment, a quiz or an exam.', 'top'),
+      tip('cw-empty', 'Nothing here yet', student ? 'Items from your courses will appear here.' : 'Use \u201cNew\u201d to add an assignment, a quiz or an exam.', 'top'),
     );
   }
   return steps;
@@ -66,16 +60,16 @@ const PUBLISH_NOTE: Record<Kind, string> = {
 
 /** Parts shared by the assignment, quiz and exam detail pages. */
 function itemTour(kind: Kind, specific: () => DriveStep[]): TourBuilder {
-  return () => {
-    const steps: DriveStep[] = [step('cwd-info', `About this ${kind}`, INFO_TEXT[kind])];
+  return ({ role }) => {
+    const steps: DriveStep[] = [tip('cwd-info', `About this ${kind}`, INFO_TEXT[kind])];
     if (present('cwd-draft')) {
       steps.push(
-        step('cwd-draft', 'Still a draft', 'Students cannot see it, and are not notified, until you publish it.'),
+        tip('cwd-draft', 'Still a draft', 'Students cannot see it, and are not notified, until you publish it.'),
       );
     }
     if (present('cwd-actions')) {
       steps.push(
-        step(
+        tip(
           'cwd-actions',
           'Publish, edit or delete',
           `Publish makes it visible to students and notifies them. Edit changes the details. Delete asks you to confirm first.${PUBLISH_NOTE[kind]}`,
@@ -85,7 +79,7 @@ function itemTour(kind: Kind, specific: () => DriveStep[]): TourBuilder {
     }
     if (present('cwd-score')) {
       steps.push(
-        step(
+        tip(
           'cwd-score',
           'Your score',
           'Your teacher enters your score and a comment after checking your work in person. You are notified when it appears.',
@@ -95,7 +89,7 @@ function itemTour(kind: Kind, specific: () => DriveStep[]): TourBuilder {
     }
     if (present('cwd-scores')) {
       steps.push(
-        step(
+        tip(
           'cwd-scores',
           'Scores',
           'Enter each student\u2019s score after checking their work in person. Students see their own score and comment, and are notified.',
@@ -104,15 +98,51 @@ function itemTour(kind: Kind, specific: () => DriveStep[]): TourBuilder {
       );
     }
     steps.push(...specific());
+    // The notes panel sits at the bottom of the page and only exists for the course's teacher.
+    if (role !== 'student' && present('mp-panel')) steps.push(...notesSteps());
     return steps;
   };
+}
+
+/** "Notes to students" panel on the assignment, quiz and exam detail pages. */
+function notesSteps(): DriveStep[] {
+  const steps: DriveStep[] = [
+    tip(
+      'mp-panel',
+      'Notes to students',
+      'Comment on a student\u2019s work, remind them of a missed deadline, or ask for a correction. The count shows how many notes are open and how many are resolved.',
+      'top',
+    ),
+    tip(
+      'mp-write',
+      'Write a note',
+      'Choose what it is about (a comment, a missed deadline or a correction), pick one or more students, then write your note. Each student you choose is notified, and only they can read it. The button stays off until the item is published, because students can only be mentioned on what they can see.',
+      'left',
+    ),
+  ];
+  if (present('mp-list')) {
+    steps.push(
+      tip('mp-list', 'Who has seen it', 'Each note shows the student, the reason, and a badge: Not seen yet, Seen, or Resolved.', 'top'),
+    );
+  }
+  if (present('mp-actions')) {
+    steps.push(
+      tip(
+        'mp-actions',
+        'Resolve or delete',
+        'Mark resolved closes the matter, and Reopen undoes it. The bin deletes a note for good after asking you to confirm, so use it only for a note written by mistake.',
+        'left',
+      ),
+    );
+  }
+  return steps;
 }
 
 export const assignmentDetailTour = itemTour('assignment', () => {
   const steps: DriveStep[] = [];
   if (present('ad-work')) {
     steps.push(
-      step(
+      tip(
         'ad-work',
         'Your work',
         'Hand in a file or a link. Work handed in after the due date is marked late. You can replace it until it is graded; after grading it is locked.',
@@ -122,7 +152,7 @@ export const assignmentDetailTour = itemTour('assignment', () => {
   }
   if (present('ad-submissions')) {
     steps.push(
-      step(
+      tip(
         'ad-submissions',
         'Submissions',
         'See who handed in, who is missing and who is graded. Download a file, write a note to a student, or use Grade / Edit grade.',
@@ -137,7 +167,7 @@ export const quizDetailTour = itemTour('quiz', () => {
   const steps: DriveStep[] = [];
   if (present('qd-attempt')) {
     steps.push(
-      step(
+      tip(
         'qd-attempt',
         'Take the quiz',
         'You can take it once. With a time limit, the timer starts when you press Start and keeps running even if you close the page. Answers save as you go. Afterwards your score and a View result button appear here.',
@@ -147,7 +177,7 @@ export const quizDetailTour = itemTour('quiz', () => {
   }
   if (present('qd-questions')) {
     steps.push(
-      step(
+      tip(
         'qd-questions',
         'Questions',
         'Add questions here, then publish the quiz. Once students have taken it, the questions lock to keep results fair.',
@@ -156,7 +186,7 @@ export const quizDetailTour = itemTour('quiz', () => {
     );
   }
   if (present('qd-results')) {
-    steps.push(step('qd-results', 'Results', 'Who took the quiz, who did not, and the class average.', 'top'));
+    steps.push(tip('qd-results', 'Results', 'Who took the quiz, who did not, and the class average.', 'top'));
   }
   return steps;
 });
@@ -166,11 +196,11 @@ export const examDetailTour = itemTour('exam', () => []);
 /** /quiz-results/:attemptId (students see their own attempt; admins and teachers see a student's) */
 export const quizResultTour: TourBuilder = () => {
   const steps: DriveStep[] = [
-    step('qr-header', 'Quiz result', 'The quiz, its course and when it was submitted. If a teacher or admin is viewing, the student\u2019s name is shown too.'),
+    tip('qr-header', 'Quiz result', 'The quiz, its course and when it was submitted. If a teacher or admin is viewing, the student\u2019s name is shown too.'),
   ];
   if (present('qr-auto')) {
     steps.push(
-      step(
+      tip(
         'qr-auto',
         'Submitted automatically',
         'The time limit ended, so the quiz was submitted at the deadline. Only answers saved by then were graded, and unanswered questions scored zero.',
@@ -178,11 +208,11 @@ export const quizResultTour: TourBuilder = () => {
     );
   }
   steps.push(
-    step('qr-score', 'Score', 'The percentage, the points earned out of the total, and how many questions were correct.'),
+    tip('qr-score', 'Score', 'The percentage, the points earned out of the total, and how many questions were correct.'),
   );
   if (present('qr-first')) {
     steps.push(
-      step(
+      tip(
         'qr-first',
         'Each question',
         'A green check means correct and a red cross means incorrect. Each question shows its points, the answer given, and the correct answer when it was wrong.',
