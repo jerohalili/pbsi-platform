@@ -62,7 +62,7 @@ export function ProfileSection() {
   };
 
   return (
-    <Card>
+    <Card data-tour="st-profile">
       <form onSubmit={submit}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

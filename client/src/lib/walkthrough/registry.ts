@@ -2,6 +2,7 @@ import { matchPath } from 'react-router-dom';
 import type { PageTour, WalkthroughRole } from './types.ts';
 import { dashboardTour } from './dashboard.ts';
 import { courseDetailTour, coursesTour, moduleEditTour } from './courses.ts';
+import { discussionsTour, discussionThreadTour, notificationsTour, settingsTour } from './community.ts';
 import { attendanceTour, gradesTour, timetableTour } from './records.ts';
 import { assignmentDetailTour, courseworkTour, examDetailTour, quizDetailTour } from './coursework.ts';
 
@@ -17,6 +18,10 @@ export const PAGE_TOURS: PageTour[] = [
   { key: 'grades', pattern: '/grades', build: gradesTour },
   { key: 'attendance', pattern: '/attendance', build: attendanceTour },
   { key: 'timetable', pattern: '/timetable', build: timetableTour },
+  { key: 'discussions', pattern: '/discussions', build: discussionsTour },
+  { key: 'discussion-thread', pattern: '/discussions/:id', build: discussionThreadTour },
+  { key: 'notifications', pattern: '/notifications', build: notificationsTour },
+  { key: 'settings', pattern: '/settings', build: settingsTour },
   { key: 'module-edit', pattern: '/courses/:courseId/modules/:moduleId/edit', build: moduleEditTour, roles: ['admin', 'teacher'] },
 ];
 

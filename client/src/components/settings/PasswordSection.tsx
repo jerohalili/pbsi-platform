@@ -37,7 +37,7 @@ export function PasswordSection() {
   };
 
   return (
-    <Card>
+    <Card data-tour="st-password">
       <form onSubmit={submit}>
         <CardHeader>
           <CardTitle>Password</CardTitle>

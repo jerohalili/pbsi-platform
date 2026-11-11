@@ -195,7 +195,7 @@ export default function NotificationsPage() {
     <div className="w-full bg-site-bg px-0 py-6 md:min-h-screen md:px-4 md:py-12">
       <div className="max-w-3xl mx-auto">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-          <div>
+          <div data-tour="nt-header">
             <h1 className="text-2xl font-bold text-site-text">Notifications</h1>
             <p className="text-site-muted">
               {unreadCount > 0
@@ -203,13 +203,13 @@ export default function NotificationsPage() {
                 : 'You’re all caught up.'}
             </p>
           </div>
-          <Button variant="outline" size="sm" onClick={markAllRead} disabled={unreadCount === 0 || markingAll}>
+          <Button data-tour="nt-mark-all" variant="outline" size="sm" onClick={markAllRead} disabled={unreadCount === 0 || markingAll}>
             <CheckCheck className="mr-2 h-4 w-4" />
             Mark all as read
           </Button>
         </div>
 
-        <div className="mb-4 inline-flex rounded-lg border border-site-border bg-white p-1" role="group" aria-label="Filter notifications">
+        <div data-tour="nt-filter" className="mb-4 inline-flex rounded-lg border border-site-border bg-white p-1" role="group" aria-label="Filter notifications">
           {(['all', 'unread'] as const).map((value) => (
             <button
               key={value}
@@ -244,7 +244,7 @@ export default function NotificationsPage() {
         )}
 
         {status === 'ready' && items.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
+          <div data-tour="nt-empty" className="flex flex-col items-center justify-center py-20 text-center">
             <Bell className="mb-4 h-16 w-16 text-site-muted/30" />
             <p className="text-site-muted">
               {filter === 'unread' ? 'No unread notifications.' : 'You have no notifications yet.'}
@@ -254,8 +254,8 @@ export default function NotificationsPage() {
 
         {status === 'ready' && items.length > 0 && (
           <>
-            <ul className="overflow-hidden rounded-xl border border-site-border bg-site-card">
-              {items.map((n) => {
+            <ul data-tour="nt-list" className="overflow-hidden rounded-xl border border-site-border bg-site-card">
+              {items.map((n, i) => {
                 const Icon = TYPE_ICONS[n.type] ?? Bell;
                 return (
                   <li
@@ -300,6 +300,7 @@ export default function NotificationsPage() {
                     </button>
                     <div className="flex shrink-0 items-center pr-2">
                       <button
+                        data-tour={i === 0 ? 'nt-remove' : undefined}
                         type="button"
                         onClick={() => remove(n)}
                         aria-label={`Remove notification: ${n.title}`}

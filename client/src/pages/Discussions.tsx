@@ -48,12 +48,13 @@ export default function DiscussionsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
+        <div data-tour="dc-header">
           <h1 className="text-2xl font-bold">Discussions</h1>
           <p className="text-muted-foreground">Ask questions, share ideas and help each other learn.</p>
         </div>
         <div className="flex items-center gap-2">
           <select
+            data-tour="dc-course"
             className={selectClass}
             value={courseId}
             onChange={(e) => setSearchParams({ course: e.target.value })}
@@ -66,7 +67,7 @@ export default function DiscussionsPage() {
               </option>
             ))}
           </select>
-          <Button onClick={() => setCreating(true)} disabled={!courseId}>
+          <Button data-tour="dc-new" onClick={() => setCreating(true)} disabled={!courseId}>
             <Plus className="w-4 h-4 mr-2" /> New discussion
           </Button>
         </div>
@@ -86,21 +87,21 @@ export default function DiscussionsPage() {
           </Button>
         </Card>
       ) : courses.length === 0 ? (
-        <Card className="p-10 text-center text-muted-foreground">
+        <Card data-tour="dc-empty" className="p-10 text-center text-muted-foreground">
           <MessageCircle className="w-8 h-8 mx-auto mb-3 opacity-60" />
           <p>There are no courses yet, so there is nothing to discuss.</p>
         </Card>
       ) : threads.length === 0 ? (
-        <Card className="p-10 text-center text-muted-foreground">
+        <Card data-tour="dc-empty" className="p-10 text-center text-muted-foreground">
           <MessageCircle className="w-8 h-8 mx-auto mb-3 opacity-60" />
           <p className="font-medium text-foreground">No discussions in this course yet</p>
           <p className="text-sm mt-1">Got a question? Someone else is probably wondering the same thing.</p>
         </Card>
       ) : (
         <ul className="space-y-3">
-          {threads.map((t) => (
+          {threads.map((t, i) => (
             <li key={t.id}>
-              <Card className="p-4 space-y-2">
+              <Card data-tour={i === 0 ? 'dc-thread' : undefined} className="p-4 space-y-2">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">

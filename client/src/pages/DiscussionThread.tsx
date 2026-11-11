@@ -114,6 +114,8 @@ export default function DiscussionThreadPage() {
 
   const canReply = !thread.is_locked || thread.can_moderate;
   const canMarkAnswer = thread.is_mine || thread.can_moderate;
+  // The first reply still on screen carries the walkthrough marker for the reply buttons.
+  const firstLiveReplyId = replies.find((x) => !x.is_deleted)?.id;
 
   const patchThread = async (changes: Record<string, unknown>, failTitle: string) => {
     try {
@@ -187,7 +189,7 @@ export default function DiscussionThreadPage() {
     <div className="space-y-6">
       {back}
 
-      <Card className="p-5 space-y-4">
+      <Card data-tour="dt-post" className="p-5 space-y-4">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="space-y-2 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
@@ -223,6 +225,7 @@ export default function DiscussionThreadPage() {
             {thread.can_moderate && (
               <>
                 <Button
+                  data-tour="dt-moderate"
                   variant="outline"
                   size="sm"
                   onClick={() => patchThread({ is_pinned: !thread.is_pinned }, 'Couldn’t update the discussion')}
@@ -242,6 +245,7 @@ export default function DiscussionThreadPage() {
             )}
             {thread.is_mine && !editingThread && (
               <Button
+                data-tour="dt-edit"
                 variant="outline"
                 size="sm"
                 disabled={thread.is_locked && !thread.can_moderate}
@@ -260,7 +264,7 @@ export default function DiscussionThreadPage() {
               </Button>
             )}
             {!thread.is_mine && (
-              <Button variant="ghost" size="sm" onClick={() => setReportTarget({ kind: 'thread', id: thread.id })}>
+              <Button data-tour="dt-report" variant="ghost" size="sm" onClick={() => setReportTarget({ kind: 'thread', id: thread.id })}>
                 <Flag className="w-4 h-4 mr-2" /> Report
               </Button>
             )}
@@ -292,7 +296,7 @@ export default function DiscussionThreadPage() {
         ) : null}
       </Card>
 
-      <section className="space-y-3">
+      <section data-tour="dt-replies" className="space-y-3">
         <h2 className="text-lg font-bold">
           {replies.filter((r) => !r.is_deleted).length}{' '}
           {replies.filter((r) => !r.is_deleted).length === 1 ? 'reply' : 'replies'}
@@ -366,7 +370,7 @@ export default function DiscussionThreadPage() {
                       <p className="whitespace-pre-wrap break-words">{r.content}</p>
                     )}
 
-                    <div className="flex items-center flex-wrap gap-1">
+                    <div data-tour={r.id === firstLiveReplyId ? 'dt-reply-actions' : undefined} className="flex items-center flex-wrap gap-1">
                       {canReply && (
                         <Button
                           variant="ghost"
@@ -431,7 +435,7 @@ export default function DiscussionThreadPage() {
       </section>
 
       {canReply ? (
-        <form onSubmit={postReply} className="space-y-3">
+        <form data-tour="dt-reply-form" onSubmit={postReply} className="space-y-3">
           {thread.is_locked && (
             <p className="text-sm text-muted-foreground">
               This discussion is locked. Only you (as a teacher or admin) can still reply.
@@ -466,7 +470,7 @@ export default function DiscussionThreadPage() {
           </div>
         </form>
       ) : (
-        <Card className="p-4 text-sm text-muted-foreground flex items-center gap-2">
+        <Card data-tour="dt-locked" className="p-4 text-sm text-muted-foreground flex items-center gap-2">
           <Lock className="w-4 h-4" /> This discussion is locked, so new replies are turned off.
         </Card>
       )}

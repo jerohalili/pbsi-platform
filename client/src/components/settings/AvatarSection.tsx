@@ -70,7 +70,7 @@ export function AvatarSection() {
   };
 
   return (
-    <Card>
+    <Card data-tour="st-avatar">
       <CardHeader>
         <CardTitle>Profile picture</CardTitle>
         <CardDescription>Shown next to your name. Square pictures work best.</CardDescription>
