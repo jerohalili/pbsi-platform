@@ -16,30 +16,12 @@ import { AnnouncementCard } from './AnnouncementCard.tsx';
 
 const MAX_SHOWN = 2;
 
-/** Dismissed banners are remembered per person on this device (a shared school computer must not carry one person's choice to the next). */
-const dismissedKey = (userId: string) => `pbsi:dismissedBanners:${userId}`;
-
-function readDismissed(userId: string): string[] {
-  try {
-    const parsed: unknown = JSON.parse(localStorage.getItem(dismissedKey(userId)) ?? '[]');
-    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeDismissed(userId: string, ids: string[]): void {
-  try {
-    localStorage.setItem(dismissedKey(userId), JSON.stringify(ids));
-  } catch {
-    // Storage can be full or blocked; the banner is then simply hidden until the page reloads.
-  }
-}
-
 /**
  * Urgent announcements, shown under the top bar on every page until they expire. Each one can be
- * closed with its X (this hides only the banner on this device; the announcement stays on the
- * dashboard). "Read the full announcement" opens the whole text here, without leaving the page.
+ * closed with its X. That choice lives only in memory: it holds while the person moves between
+ * pages, and a refresh or signing in again brings the banner back (the announcement itself also
+ * stays on the dashboard). "Read the full announcement" opens the whole text here, without
+ * leaving the page.
  */
 export function AnnouncementBanner() {
   const { user } = useAuth();
@@ -49,9 +31,9 @@ export function AnnouncementBanner() {
   const [dismissed, setDismissed] = useState<string[]>([]);
   const [readOpen, setReadOpen] = useState(false);
 
-  // Load this person's dismissed list when they sign in (or a different person signs in).
+  // Signing in again (or a different person signing in) starts with nothing dismissed.
   useEffect(() => {
-    setDismissed(userId ? readDismissed(userId) : []);
+    setDismissed([]);
   }, [userId]);
 
   // Re-check expiry every 30 s, so a banner left open on a screen goes away by itself.
@@ -61,13 +43,7 @@ export function AnnouncementBanner() {
     return () => window.clearInterval(id);
   }, []);
 
-  const dismiss = (id: string) => {
-    if (!userId) return;
-    // Keep only ids that still exist, so the saved list cannot grow forever.
-    const next = Array.from(new Set([...dismissed, id])).filter((x) => (data ?? []).some((a) => a.id === x));
-    setDismissed(next);
-    writeDismissed(userId, next);
-  };
+  const dismiss = (id: string) => setDismissed((current) => (current.includes(id) ? current : [...current, id]));
 
   const urgent = (data ?? []).filter((a) => a.is_urgent && isLiveNow(a, now) && !dismissed.includes(a.id));
   if (urgent.length === 0) return null;
